@@ -28,7 +28,8 @@ headers = [
     # fj.contrib
     "fastjet/contrib/LundGenerator.hh",
     "fastjet/contrib/Recluster.hh",
-    "fastjet/contrib/IFNPlugin.hh", "fastjet/contrib/FlavInfo.hh",
+    "fastjet/contrib/FlavInfo.hh",
+    "fastjet/contrib/IFNPlugin.hh",
     "fastjet/contrib/GHSAlgo.hh",
     "fastjet/contrib/CMPPlugin.hh",
 
@@ -427,38 +428,17 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                         setattr(self, name, h3D)
                         getattr(self, hist_list_name).append(h3D)
 
-                        # SD-with-JADE tagged jets
-                        name = ('h3D_%s_jade_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
-                            len(obs_label) else ('h3D_%s_jade_JetPt_%s_R%s' % (observable, parton_type, jetR))
-                        h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
-                        h3D.Sumw2()
-                        h3D.GetXaxis().SetTitle(title[0])
-                        h3D.GetYaxis().SetTitle(title[1])
-                        h3D.GetZaxis().SetTitle(title[2])
-                        setattr(self, name, h3D)
-                        getattr(self, hist_list_name).append(h3D)
-
-                        # WTA tagged jets
-                        name = ('h3D_%s_wta_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
-                            len(obs_label) else ('h3D_%s_wta_JetPt_%s_R%s' % (observable, parton_type, jetR))
-                        h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
-                        h3D.Sumw2()
-                        h3D.GetXaxis().SetTitle(title[0])
-                        h3D.GetYaxis().SetTitle(title[1])
-                        h3D.GetZaxis().SetTitle(title[2])
-                        setattr(self, name, h3D)
-                        getattr(self, hist_list_name).append(h3D)
-
-                        # IFN tagged jets
-                        name = ('h3D_%s_ifn_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
-                            len(obs_label) else ('h3D_%s_ifn_JetPt_%s_R%s' % (observable, parton_type, jetR))
-                        h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
-                        h3D.Sumw2()
-                        h3D.GetXaxis().SetTitle(title[0])
-                        h3D.GetYaxis().SetTitle(title[1])
-                        h3D.GetZaxis().SetTitle(title[2])
-                        setattr(self, name, h3D)
-                        getattr(self, hist_list_name).append(h3D)
+                        # jetflav IRC-safe algorithms
+                        for algo_name in ["JADE", "WTA", "IFN", "CMP", "GHS"]:
+                            name = ('h3D_%s_%s_JetPt_%s_R%s_%s' % (observable, algo_name, parton_type, jetR, obs_label)) if \
+                                len(obs_label) else ('h3D_%s_%s_JetPt_%s_R%s' % (observable, algo_name, parton_type, jetR))
+                            h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
+                            h3D.Sumw2()
+                            h3D.GetXaxis().SetTitle(title[0])
+                            h3D.GetYaxis().SetTitle(title[1])
+                            h3D.GetZaxis().SetTitle(title[2])
+                            setattr(self, name, h3D)
+                            getattr(self, hist_list_name).append(h3D)
 
     #---------------------------------------------------------------
     # Initiate jet defs, selectors, and sd (if required)
@@ -472,22 +452,26 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             jet_def = fj.JetDefinition(fj.antikt_algorithm, jetR)
             setattr(self, "jet_def_R%s" % jetR_str, jet_def)
 
-        print('eta range for particles after hadronization set to', self.min_eta_hadron, "< eta <", self.max_eta_hadron)
+        #print('eta range for particles after hadronization set to', self.min_eta_hadron, "< eta <", self.max_eta_hadron)
         parts_selector_h = fj.SelectorAbsEtaMin(self.min_eta_hadron)
         parts_selector_h &= fj.SelectorAbsEtaMax(self.max_eta_hadron)
         parts_selector_h &= fj.SelectorPtMin(0.10)
         setattr(self, "parts_selector_h", parts_selector_h)
         parts_selector_ch = parts_selector_h
         setattr(self, "parts_selector_ch", parts_selector_ch)
-        print("parts_selector_h:", parts_selector_h.description())
+        print("Particle selector is:", parts_selector_h.description())
 
         for jetR in self.jetR_list:
             jetR_str = str(jetR).replace('.', '')
 
-            jet_selector = fj.SelectorPtMin(5.0)
-            jet_selector &= fj.SelectorAbsEtaMax(self.max_eta_hadron - jetR)
+            self.jetptcut = 5.0
+            jet_selector = fj.SelectorAbsEtaMax(self.max_eta_hadron - jetR)
+            if self.min_eta_hadron != 0:
+                jet_selector &= fj.SelectorAbsEtaMin(self.min_eta_hadron + jetR)
+            jet_selector &= fj.SelectorPtMin(self.jetptcut)
             #jet_selector = fj.SelectorPtMin(0.) & fj.SelectorAbsEtaMax(self.max_eta_hadron - jetR)
             setattr(self, "jet_selector_R%s" % jetR_str, jet_selector)
+            print("For R=%.1f, jet selector is:" % jetR, jet_selector.description())
 
             count1 = 0  # Number of partonic parents which match to >1 ch-jets
             setattr(self, "count1_R%s" % jetR_str, count1)
@@ -689,15 +673,6 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 jets_h = fj.sorted_by_pt(jet_selector(jet_def(parts_selector_h(parts_pythia_h))))
                 jets_ch = fj.sorted_by_pt(jet_selector(jet_def(parts_selector_ch(parts_pythia_hch)))) # charged hadron level
 
-                # Run IFN
-                alpha = 2.0;  omega = 3.0 - alpha;  # IFN constants
-                flav_summation = fj.contrib.FlavRecombiner.net
-                IFN_plugin = fj.contrib.IFNPlugin(jet_def, alpha, omega, flav_summation)
-                jet_def_IFN = fj.JetDefinition(IFN_plugin)
-                for p in parts_pythia_h:
-                    pdg_id = pythiafjext.getPythia8Particle(p).id()
-                    p.set_user_info(fj.contrib.FlavHistory(pdg_id))
-                jets_h_IFN = fj.sorted_by_pt(jet_selector(jet_def_IFN(parts_selector_h(parts_pythia_h))))
             # print("!! length of jets_ch", len(jets_ch))
 
             R_label = str(jetR).replace('.', '') + 'Scaled'
@@ -1015,88 +990,133 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
                             # Custom tagged jets
                             if jade_tagged:
-                                getattr(self, ('h3D_%s_jade_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
-                                    len(obs_label) else ('h3D_%s_jade_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
+                                getattr(self, ('h3D_%s_JADE_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
+                                    len(obs_label) else ('h3D_%s_JADE_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
                                     jet.pt(), D0_pt, obs)
 
                             if wta_tagged:
-                                getattr(self, ('h3D_%s_wta_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
-                                    len(obs_label) else ('h3D_%s_wta_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
+                                getattr(self, ('h3D_%s_WTA_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
+                                    len(obs_label) else ('h3D_%s_WTA_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
                                     jet.pt(), D0_pt, obs)
 
-            # IFN jets
-            for i_jh, jet in enumerate(jets_h_IFN):
+            # jetflav IRC-safe jets
+            if self.replaceKPpairs or self.phimeson:
+                pdg_ids = [pythiafjext.getPythia8Particle(p).id() for p in parts_pythia_h]
 
-                IFN_flav = fj.contrib.FlavHistory.current_flavour_of(jet).description()
-                charm_tagged = 'c' in IFN_flav
-                if not charm_tagged:
-                    continue
+                # IFN jets
+                IFN_alpha = 2.0;  IFN_omega = 3.0 - IFN_alpha;  # IFN constants
+                flav_summation = fj.contrib.FlavRecombiner.net
+                IFN_plugin = fj.contrib.IFNPlugin(jet_def, IFN_alpha, IFN_omega, flav_summation)
+                jet_def_IFN = fj.JetDefinition(IFN_plugin)
+                for ip, p in enumerate(parts_pythia_h):  # Reset user info
+                    p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
+                jets_h_IFN = fj.sorted_by_pt(jet_selector(jet_def_IFN(parts_selector_h(parts_pythia_h))))
 
-                # Save D0 info -- TODO: check for D*
-                D0meson = None
-                pdg_ids = []
-                if ( self.replaceKPpairs ):
-                    # print("There are ", len(jet.constituents()), "constituents.")
-                    for c in jet.constituents():
-                        flav_info = fj.contrib.FlavHistory.current_flavour_of(c)
-                        pdg_idabs = abs(flav_info.pdg_code())
-                        pdg_ids.append(pdg_idabs)
-                        if (pdg_idabs == 421):
-                            D0meson = c
-                    if not D0meson:  # There is charm but not D0
-                        continue
+                for i_jh, jet in enumerate(jets_h_IFN):
+                    self.get_flav_fill_histograms(jet, jetR, "IFN")
 
-                # Fill histograms
-                for observable in self.observable_list:
-                    #print("len(self.obs_settings[observable])", len(self.obs_settings[observable]))
-                    for i in range(len(self.obs_settings[observable])):
+                # GHS jets
+                GHS_alpha = 1;  GHS_omega = 2;  # GHS constants
+                jet_def_GHS_base = fj.JetDefinition(fj.antikt_algorithm, jetR)
+                flav_recombiner = fj.contrib.FlavRecombiner()
+                jet_def_GHS_base.set_recombiner(flav_recombiner)
+                for ip, p in enumerate(parts_pythia_h):  # Reset user info
+                    p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
+                jets_h_GHS_base = jet_selector(jet_def_GHS_base(parts_selector_h(parts_pythia_h)))
+                jets_h_GHS = fj.sorted_by_pt(fj.contrib.run_GHS(jets_h_GHS_base, self.jetptcut, GHS_alpha, GHS_omega, flav_recombiner))
 
-                        obs_setting = self.obs_settings[observable][i]
-                        grooming_setting = self.obs_grooming_settings[observable][i]
-                        obs_label = self.utils.obs_label(obs_setting, grooming_setting)
+                for i_jh, jet in enumerate(jets_h_GHS):
+                    self.get_flav_fill_histograms(jet, jetR, "GHS")
 
-                        # Groom jet, if applicable
-                        jet_groomed_lund = None
-                        if grooming_setting:
-                            if 'sd' not in grooming_setting:
-                                raise NotImplementedError("Only SD grooming is implemented")
-                            zcut = grooming_setting['sd'][0]
-                            beta = grooming_setting['sd'][1]
-                            lg = fj.contrib.LundGenerator(self.reclustering_algorithm)
-                            for ld in lg.result(jet):  # Vector of LundDeclustering (reclustered with JADE)
-                                if ld.z() > zcut * (ld.Delta() / jetR) ** beta:  # SD condition
-                                    jet_groomed_lund = ld
-                                    break
-                            if not jet_groomed_lund:
-                                continue
+                # CMP jets
+                CMP_a = 0.1  # 'a' parameter in:   kappa_ij = 1/a * (kT_i^2 + kT_j^2) / (2*kT_max^2)
+                CMP_corr = fj.CMPPlugin.CorrectionType.OverAllCoshyCosPhi_a2  # IRC-safe correction
+                CMP_clust = fj.CMPPlugin.ClusteringType.DynamicKtMax          # Dynamic def of ktmax
+                CMP_plugin = fj.CMPPlugin(jetR, CMP_a, CMP_corr, CMP_clust)
+                jet_def_CMP = fj.JetDefinition(CMP_plugin)
+                flav_recombiner = fj.contrib.FlavRecombiner()
+                jet_def_CMP.set_recombiner(flav_recombiner)
+                for ip, p in enumerate(parts_pythia_h):  # Reset user info
+                    p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
+                jets_h_CMP = fj.sorted_by_pt(jet_selector(jet_def_CMP(parts_selector_h(parts_pythia_h))))
 
-                        # Apply cut on leading track pT
-                        if self.leading_parton_pt_cut:
-                            leading_parton = fj.sorted_by_pt(jet.constituents())[0]
-                            if (leading_parton.pt() < self.leading_parton_pt_cut):
-                                continue
-
-                        obs = self.calculate_observable(
-                            observable, jet, jet_groomed_lund, jetR, obs_setting,
-                            grooming_setting, obs_label, jet.pt())
-
-                        for parton_type in ["charm"]: # parton_types:
-                            #fill parton hnsparse info
-                            if (self.replaceKPpairs or self.phimeson): # phimeson has bad naming convention but is properly filled here
-                                D0_px = D0meson.px()
-                                D0_py = D0meson.py()
-                                D0_pt = math.sqrt(D0_px * D0_px + D0_py * D0_py)
-                            else:
-                                D0_pt = -1
-
-                            # IFN jet histograms
-                            getattr(self, ('h3D_%s_ifn_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
-                                len(obs_label) else ('h3D_%s_ifn_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
-                                jet.pt(), D0_pt, obs)
-
+                for i_jh, jet in enumerate(jets_h_CMP):
+                    self.get_flav_fill_histograms(jet, jetR, "CMP")
 
             setattr(self, "count1_R%s" % jetR_str, count1)
             setattr(self, "count2_R%s" % jetR_str, count2)
+
+    #---------------------------------------------------------------
+    # Get IRC-safe jet flavor and fill appropriate histograms
+    #---------------------------------------------------------------
+    def get_flav_fill_histograms(self, jet, jetR, algo_name):
+
+        flav = fj.contrib.FlavHistory.current_flavour_of(jet).description()
+        charm_tagged = 'c' in flav
+        if not charm_tagged:
+            return
+
+        # Save D0 info -- TODO: check for D*
+        D0meson = None
+        pdg_ids = []
+        if ( self.replaceKPpairs ):
+            # print("There are ", len(jet.constituents()), "constituents.")
+            for c in jet.constituents():
+                flav_info = fj.contrib.FlavHistory.current_flavour_of(c)
+                pdg_idabs = abs(flav_info.pdg_code())
+                pdg_ids.append(pdg_idabs)
+                if (pdg_idabs == 421):
+                    D0meson = c
+            if not D0meson:  # There is charm but not D0
+                return
+
+        # Fill histograms
+        for observable in self.observable_list:
+            #print("len(self.obs_settings[observable])", len(self.obs_settings[observable]))
+            for i in range(len(self.obs_settings[observable])):
+
+                obs_setting = self.obs_settings[observable][i]
+                grooming_setting = self.obs_grooming_settings[observable][i]
+                obs_label = self.utils.obs_label(obs_setting, grooming_setting)
+
+                # Groom jet, if applicable
+                jet_groomed_lund = None
+                if grooming_setting:
+                    if 'sd' not in grooming_setting:
+                        raise NotImplementedError("Only SD grooming is implemented")
+                    zcut = grooming_setting['sd'][0]
+                    beta = grooming_setting['sd'][1]
+                    lg = fj.contrib.LundGenerator(self.reclustering_algorithm)
+                    for ld in lg.result(jet):  # Vector of LundDeclustering (reclustered with JADE)
+                        if ld.z() > zcut * (ld.Delta() / jetR) ** beta:  # SD condition
+                            jet_groomed_lund = ld
+                            break
+                    if not jet_groomed_lund:
+                        return
+
+                # Apply cut on leading track pT
+                if self.leading_parton_pt_cut:
+                    leading_parton = fj.sorted_by_pt(jet.constituents())[0]
+                    if (leading_parton.pt() < self.leading_parton_pt_cut):
+                        return
+
+                obs = self.calculate_observable(
+                    observable, jet, jet_groomed_lund, jetR, obs_setting,
+                    grooming_setting, obs_label, jet.pt())
+
+                for parton_type in ["charm"]: # parton_types:
+                    #fill parton hnsparse info
+                    if (self.replaceKPpairs or self.phimeson): # phimeson has bad naming convention but is properly filled here
+                        D0_px = D0meson.px()
+                        D0_py = D0meson.py()
+                        D0_pt = math.sqrt(D0_px * D0_px + D0_py * D0_py)
+                    else:
+                        D0_pt = -1
+
+                    # Fill appropriate jet histograms
+                    getattr(self, ('h3D_%s_%s_JetPt_%s_R%s_%s' % (observable, algo_name, parton_type, jetR, obs_label)) if \
+                        len(obs_label) else ('h3D_%s_%s_JetPt_%s_R%s' % (observable, algo_name, parton_type, jetR))).Fill(
+                        jet.pt(), D0_pt, obs)
 
     #---------------------------------------------------------------
     # Calculate the observable given a jet

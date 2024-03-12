@@ -33,8 +33,8 @@ class CommonUtils(common_base.CommonBase):
       return [obs_config_dict[name]['axis'] for name in obs_subconfig_list]
     elif observable == 'ang':
       return [obs_config_dict[name]['alpha'] for name in obs_subconfig_list]
-    elif observable == 'theta_g':
-      return [obs_config_dict[name]['SoftDrop'] for name in obs_subconfig_list if 'SoftDrop' in obs_config_dict[name]]
+    #elif observable == 'theta_g':
+    #  return [obs_config_dict[name]['SoftDrop'] for name in obs_subconfig_list if 'SoftDrop' in obs_config_dict[name]]
     ##### new edits below #####
     elif observable == 'jet_ENC_RL':
       return [obs_config_dict[name]['trk_thrd'] for name in obs_subconfig_list]
