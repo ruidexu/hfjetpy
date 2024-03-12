@@ -1002,11 +1002,14 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             # jetflav IRC-safe jets
             if self.replaceKPpairs or self.phimeson:
                 pdg_ids = [pythiafjext.getPythia8Particle(p).id() for p in parts_pythia_h]
+                jet_def_base = fj.JetDefinition(fj.antikt_algorithm, jetR)
+                flav_recombiner = fj.contrib.FlavRecombiner()
+                jet_def_base.set_recombiner(flav_recombiner)
 
                 # IFN jets
-                IFN_alpha = 2.0;  IFN_omega = 3.0 - IFN_alpha;  # IFN constants
+                IFN_alpha = 2;  IFN_omega = 3 - IFN_alpha;  # IFN constants
                 flav_summation = fj.contrib.FlavRecombiner.net
-                IFN_plugin = fj.contrib.IFNPlugin(jet_def, IFN_alpha, IFN_omega, flav_summation)
+                IFN_plugin = fj.contrib.IFNPlugin(jet_def_base, IFN_alpha, IFN_omega, flav_summation)
                 jet_def_IFN = fj.JetDefinition(IFN_plugin)
                 for ip, p in enumerate(parts_pythia_h):  # Reset user info
                     p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
@@ -1017,12 +1020,9 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
                 # GHS jets
                 GHS_alpha = 1;  GHS_omega = 2;  # GHS constants
-                jet_def_GHS_base = fj.JetDefinition(fj.antikt_algorithm, jetR)
-                flav_recombiner = fj.contrib.FlavRecombiner()
-                jet_def_GHS_base.set_recombiner(flav_recombiner)
                 for ip, p in enumerate(parts_pythia_h):  # Reset user info
                     p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
-                jets_h_GHS_base = jet_selector(jet_def_GHS_base(parts_selector_h(parts_pythia_h)))
+                jets_h_GHS_base = jet_selector(jet_def_base(parts_selector_h(parts_pythia_h)))
                 jets_h_GHS = fj.sorted_by_pt(fj.contrib.run_GHS(jets_h_GHS_base, self.jetptcut, GHS_alpha, GHS_omega, flav_recombiner))
 
                 for i_jh, jet in enumerate(jets_h_GHS):
