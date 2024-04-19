@@ -88,7 +88,7 @@ ROOT.TH3.SetDefaultSumw2()
 
 from heppyy.pythia_util import configuration as pyconf
 
-import process_base
+from hfjetpy.process import process_base
 
 
 ################################################################

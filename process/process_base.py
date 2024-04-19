@@ -46,9 +46,8 @@ YaspCppyyHelper().load(packs, libs, headers)
 from cppyy.gbl import fastjet as fj
 
 # Analysis utilities
-import common_base
-import process_utils
-import jet_info
+from hfjetpy.common import common_base, jet_info
+from hfjetpy.process import process_utils
 
 ################################################################
 class ProcessBase(common_base.CommonBase):

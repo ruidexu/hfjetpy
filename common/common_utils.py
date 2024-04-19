@@ -10,7 +10,7 @@
 import sys
 
 # Base class
-import common_base
+from hfjetpy.common import common_base
 
 ################################################################
 class CommonUtils(common_base.CommonBase):

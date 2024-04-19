@@ -13,7 +13,7 @@ import sys
 import numpy as np
 
 # Base class
-import common_utils
+from hfjetpy.common import common_utils
 
 ################################################################
 class ProcessUtils(common_utils.CommonUtils):

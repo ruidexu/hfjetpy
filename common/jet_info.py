@@ -7,7 +7,7 @@
 """
 
 # Base class
-import common_base
+from hfjetpy.common import common_base
 
 ################################################################
 class JetInfo(common_base.CommonBase):
