@@ -29,11 +29,11 @@ mass:
       beta: 0
 
   ############################################################################
-  config_m_SD_zcut02:
-    name: "groomed mass"
-    SoftDrop:
-      zcut: 0.2
-      beta: 0
+  #config_m_SD_zcut02:
+  #  name: "groomed mass"
+  #  SoftDrop:
+  #    zcut: 0.2
+  #    beta: 0
 
 
 ###############################################################################
@@ -52,11 +52,11 @@ zg:
       beta: 0
 
   ############################################################################
-  config_zg_zcut02:
-    name: "zg"
-    SoftDrop:
-      zcut: 0.2
-      beta: 0
+  #config_zg_zcut02:
+  #  name: "zg"
+  #  SoftDrop:
+  #    zcut: 0.2
+  #    beta: 0
 
 ###############################################################################
 theta_g:
@@ -73,8 +73,8 @@ theta_g:
       beta: 0
 
   ############################################################################
-  config_theta_g_zcut02:
-    name: "theta_g"
-    SoftDrop:
-      zcut: 0.2
-      beta: 0
+  #config_theta_g_zcut02:
+  #  name: "theta_g"
+  #  SoftDrop:
+  #    zcut: 0.2
+  #    beta: 0

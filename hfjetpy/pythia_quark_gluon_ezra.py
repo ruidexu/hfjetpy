@@ -944,7 +944,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                             zcut = grooming_setting['sd'][0]
                             beta = grooming_setting['sd'][1]
                             lg = fj.contrib.LundGenerator(self.reclustering_algorithm)
-                            for ld in lg.result(jet):  # Vector of LundDeclustering (reclustered with JADE)
+                            for ld in lg.result(jet):  # Vector of LundDeclustering
                                 if ld.z() > zcut * (ld.Delta() / jetR) ** beta:  # SD condition
                                     jet_groomed_lund = ld
                                     break
@@ -1087,7 +1087,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     zcut = grooming_setting['sd'][0]
                     beta = grooming_setting['sd'][1]
                     lg = fj.contrib.LundGenerator(self.reclustering_algorithm)
-                    for ld in lg.result(jet):  # Vector of LundDeclustering (reclustered with JADE)
+                    for ld in lg.result(jet):  # Vector of LundDeclustering
                         if ld.z() > zcut * (ld.Delta() / jetR) ** beta:  # SD condition
                             jet_groomed_lund = ld
                             break
