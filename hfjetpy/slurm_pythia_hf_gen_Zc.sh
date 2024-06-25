@@ -52,12 +52,12 @@ SCRIPT="/software/users/ezra/hfjetpy/hfjetpy/pythia_quark_gluon_ezra.py"
 CONFIG="/software/users/ezra/hfjetpy/hfjetpy/config/mass_zg_thetag.yaml"
 
 if $USE_PTHAT_MAX; then
-	echo "python $SCRIPT -o $OUTDIR -c $CONFIG --user-seed $SEED --py-pthatmin $PTHAT_MIN --py-ecm $ECM --nev $NEV_PER_JOB --replaceKP 1 --chinitscat 3 --pythiaopts HardQCD:all=on,PhaseSpace:pTHatMax=$PTHAT_MAX"
+	echo "python $SCRIPT -o $OUTDIR -c $CONFIG --user-seed $SEED --py-pthatmin $PTHAT_MIN --py-ecm $ECM --nev $NEV_PER_JOB --replaceKP 1 --chinitscat 3 --pythiaopts PhaseSpace:pTHatMax=$PTHAT_MAX"
 	python $SCRIPT -o $OUTDIR -c $CONFIG --user-seed $SEED \
 		--py-pthatmin $PTHAT_MIN --py-ecm $ECM --nev $NEV_PER_JOB \
 		--replaceKP 1 --chinitscat 3 --pythiaopts HardQCD:all=on,PhaseSpace:pTHatMax=$PTHAT_MAX
 else
-	echo "python $SCRIPT -o $OUTDIR -c $CONFIG --user-seed $SEED --py-pthatmin $PTHAT_MIN --py-ecm $ECM --nev $NEV_PER_JOB --replaceKP 1 --chinitscat 3 --pythiaopts HardQCD:all=on"
+	echo "python $SCRIPT -o $OUTDIR -c $CONFIG --user-seed $SEED --py-pthatmin $PTHAT_MIN --py-ecm $ECM --nev $NEV_PER_JOB --replaceKP 1 --chinitscat 3"
 	python $SCRIPT -o $OUTDIR -c $CONFIG --user-seed $SEED \
         --py-pthatmin $PTHAT_MIN --py-ecm $ECM --nev $NEV_PER_JOB \
         --replaceKP 1 --chinitscat 3 --pythiaopts HardQCD:all=on

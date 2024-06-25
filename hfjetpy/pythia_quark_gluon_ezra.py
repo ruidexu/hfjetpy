@@ -272,6 +272,11 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             #mycfg.append('HardQCD:all = off')
             #mycfg.append('HardQCD:hardccbar = on')
 
+            # Uncomment these lines for Z+jet
+            mycfg.append('HardQCD:all = off')
+            mycfg.append('WeakBosonAndParton:qqbar2gmZg = on')  # q qbar → gamma^*/Z^0 g
+            mycfg.append('WeakBosonAndParton:qg2gmZq = on')     # q g → gamma^*/Z^0 q
+
             mycfg.append('421:onMode = off')
             mycfg.append('421:onIfMatch = 321 211')
 
@@ -881,10 +886,17 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 if jet_gr_jade.has_constituents() and jet_gr_jade.has_structure():
                     # Look for a D0 inside the jet
                     for constit in jet_gr_jade.constituents():
-                        if pythiafjext.getPythia8Particle(constit).idAbs() == 421:
+                        pid_abs = pythiafjext.getPythia8Particle(constit).idAbs()
+                        pid_abs_str = str(pid_abs)
+                        if pid_abs == 421:
                             #n_HF_meson_found += 1
                             jade_tagged = True
-                            break;
+                            continue
+                        elif (len(pid_abs_str) >= 3 and pid_abs_str[-3] == '4') or \
+                            (len(pid_abs_str) >= 4 and pid_abs_str[-4] == '4'):
+                            # Jet has some non-D0 charm -- untag
+                            jade_tagged = False
+                            break
                 #if n_HF_meson_found == 1:
                 #   jade_tagged = True
                 if self.make_durations:
