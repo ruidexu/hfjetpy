@@ -29,6 +29,7 @@ headers = [
     "fastjet/contrib/LundGenerator.hh",
     "fastjet/contrib/Recluster.hh",
     "fastjet/contrib/FlavInfo.hh",
+    "fastjet/contrib/SDFlavPlugin.hh",
     "fastjet/contrib/IFNPlugin.hh",
     "fastjet/contrib/GHSAlgo.hh",
     "fastjet/contrib/CMPPlugin.hh",
@@ -89,8 +90,14 @@ ROOT.TH3.SetDefaultSumw2()
 from heppyy.pythia_util import configuration as pyconf
 
 from hfjetpy.process import process_base
+# importing time module 
+import time 
 
+obj = time.gmtime(0) 
+epoch = time.asctime(obj) 
+print("epoch is:", epoch) 
 
+start_time_overall = time.time()
 ################################################################
 class EMesonDecayChannel(Enum):
     kAnyDecay            = 0
@@ -108,6 +115,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
     #---------------------------------------------------------------
     # Constructor
+    # Should not be of problem
     #---------------------------------------------------------------
     def __init__(self, input_file='', config_file='', output_dir='', debug_level=0, args=None, **kwargs):
 
@@ -133,15 +141,15 @@ class PythiaQuarkGluon(process_base.ProcessBase):
         self.noISR = (bool)(1-args.ISRon)
 
         # self implemented variables to study
-        self.charmdecaysOFF = (bool)(args.nocharmdecay) #charmdecaysOFF=True(F) when charmdecayon=1(0)
-        print("charm decay input value", args.nocharmdecay)
+        self.beautydecaysOFF = (bool)(args.nobeautydecay) #charmdecaysOFF=True(F) when charmdecayon=1(0)
+        print("beauty decay input value", args.nobeautydecay) 
         self.weighted = (bool)(args.weightON) #weightON=True(F) means turn weights on(off)
         self.leading_parton_pt_cut = args.leadingptcut
         self.replaceKPpairs = (bool)(args.replaceKP) #replaceKP=True(F) means turn k/pi pairs are('nt) replaced
-        self.gg2ccbar = (bool)(args.onlygg2ccbar) #gg2ccbar=True means only run gg->ccbar process
-        self.hardccbar = (bool)(args.onlyccbar) #hard2ccbar=True means only run hard->ccbar process
+        self.gg2bbbar = (bool)(args.onlygg2bbbar) #gg2bbbar=True means only run gg->bbbar process
+        self.hardbbbar = (bool)(args.onlybbbar) #hard2bbbar=True means only run hard->bbbar process
         self.Dstar = (bool)(args.DstarON) #Dstar=True means look at D* EEC, should be run with self.replaceKPpairs=True
-        self.initscat = args.chinitscat #1=hard->ccbar, 2=gg->ccbar, 3=D0->Kpi channel, 4=hard->bbar w/ D0->Kpi
+        self.initscat = args.chinitscat #1=hard->bbbar, 2=gg->bbbar, 3=D0->Kpi channel, 4=hard->bbar w/ D0->Kpi
         self.D0wDstar = (bool)(args.D0withDstarON) #D0wDstar=True means looking at D-tagged jets including D0 from D*
         self.difNorm = (bool)(args.difNorm) #difNorm=True means normalize D* distribution with (D0+D*) jets
         self.softpion_action = args.softpion #1 = remove soft pion from D*, 2 = only pair soft pion with charged particles, 3 = only pair soft pion with D0, 4 = pair soft pion w everything
@@ -171,6 +179,13 @@ class PythiaQuarkGluon(process_base.ProcessBase):
         self.obs_bins_mass = np.concatenate(
           (np.array([0, 1]), np.linspace(1.8, 9.8, 41), np.linspace(10, 14.5, 10),
            np.linspace(15, 19, 5), np.linspace(20, 60, 9)))
+        
+        #self.obs_bins_massPtRatio = np.concatenate(
+          #(np.array([0, 1]), np.linspace(1.8, 9.8, 41), np.linspace(10, 14.5, 10),
+          # np.linspace(15, 19, 5), np.linspace(20, 60, 9)))
+          
+        ##rdc
+        self.obs_bins_massPtRatio = np.linspace(0, 1.2, 60)
 
         # Lower limit set by zcut; upper limit set by branch tagging (must be < 0.5)
         self.obs_bins_zg = np.concatenate(
@@ -198,8 +213,11 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
     #---------------------------------------------------------------
     # Main processing function
+    
+    # Should not be of problem
+    # runs init_jet_tools calculate_events
     #---------------------------------------------------------------
-    def pythia_quark_gluon(self, args):
+    def pythia_quark_gluon(self, args): 
 
         # Create ROOT TTree file for storing raw PYTHIA particle information
         outf_path = os.path.join(self.output_dir, args.tree_output_fname)
@@ -213,105 +231,190 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 #        print('user seed for pythia', self.user_seed)
         mycfg = ['Random:setSeed=on', 'Random:seed={}'.format(self.user_seed)]
         mycfg.append('HadronLevel:all=off')
-        print("charmdecays value", self.charmdecaysOFF)
-        if (self.charmdecaysOFF == True and self.replaceKPpairs == False):
+        print("beautydecays value", self.beautydecaysOFF)
+        if (self.beautydecaysOFF == True and self.replaceKPpairs == False):
             print("charm decays turning OFF")
-            # Mesons
-            mycfg.append('411:mayDecay = no')    # D+
-            mycfg.append('421:mayDecay = no')    # D0
-            mycfg.append('10411:mayDecay = no')  # D*0(2400)+
-            mycfg.append('10421:mayDecay = no')  # D*0(2400)0
-            mycfg.append('413:mayDecay = no')    # D*(2010)+
-            mycfg.append('423:mayDecay = no')    # D*(2007)0
-            mycfg.append('10413:mayDecay = no')  # D1(2420)+
-            mycfg.append('10423:mayDecay = no')  # D1(2420)0
-            mycfg.append('20413:mayDecay = no')  # D1(H)+
-            mycfg.append('20423:mayDecay = no')  # D1(2430)0
-            mycfg.append('415:mayDecay = no')    # D*2(2460)0
-            mycfg.append('425:mayDecay = no')    # D*2(2460)0
-            mycfg.append('431:mayDecay = no')    # D+s
-            mycfg.append('10431:mayDecay = no')  # D*s0(2317)+
-            mycfg.append('433:mayDecay = no')    # D*s+
-            mycfg.append('10433:mayDecay = no')  # Ds1(2536)+
-            mycfg.append('20433:mayDecay = no')  # Ds1(2460)+
-            mycfg.append('435:mayDecay = no')    # D*s2(2573)+
+            '''
+            rdc
+            # Are we looking at B+ -> J/Psi K+
+            # And we also have the channel Lamb0 -> B+ any
+            
+            # 1 is it prompt or feeddown(not interested)
+            # 2 is there another B hadron in the jet
+            # Also J/Psi -> mu mu: shoulde be disabled
+            '''
+            # Bottom Mesons
+            
+            mycfg.append('443:mayDecay = no')    # J/Psi
+            mycfg.append('511:mayDecay = no')    # B0
+            mycfg.append('521:mayDecay = no')    # B+
+            mycfg.append('10511:mayDecay = no')  # B*00
+            mycfg.append('10521:mayDecay = no')  # B*0+
+            mycfg.append('513:mayDecay = no')    # B*0
+            mycfg.append('523:mayDecay = no')    # B*+
+            mycfg.append('10513:mayDecay = no')  # B1(L)0
+            mycfg.append('10523:mayDecay = no')  # B1(L)+
+            mycfg.append('20513:mayDecay = no')  # B1(H)0
+            mycfg.append('20523:mayDecay = no')  # B1(H)+
+            mycfg.append('515:mayDecay = no')    # B*20
+            mycfg.append('525:mayDecay = no')    # B*2+
+            mycfg.append('531:mayDecay = no')    # B0s
+            mycfg.append('10531:mayDecay = no')  # B*s00
+            mycfg.append('533:mayDecay = no')    # B*s0
+            mycfg.append('10533:mayDecay = no')  # Bs1(L)0
+            mycfg.append('20533:mayDecay = no')  # Bs1(H)0
+            mycfg.append('535:mayDecay = no')    # B*s02
+            mycfg.append('541:mayDecay = no')    # B+c
+            mycfg.append('10541:mayDecay = no')  # B*c+0
+            mycfg.append('543:mayDecay = no')    # B*c+
+            mycfg.append('10543:mayDecay = no')  # Bc1(L)+
+            mycfg.append('20543:mayDecay = no')  # Bc1(H)+
+            mycfg.append('545:mayDecay = no')    # B*c+2
 
-            # Baryons
-            mycfg.append('4122:mayDecay = no')   # Lc+
-            mycfg.append('4222:mayDecay = no')   # Sigmac++
-            mycfg.append('4212:mayDecay = no')   # Sigmac+
-            mycfg.append('4112:mayDecay = no')   # Sigmac0
-            mycfg.append('4224:mayDecay = no')   # Sigma*c++
-            mycfg.append('4214:mayDecay = no')   # Sigma*c+
-            mycfg.append('4114:mayDecay = no')   # Sigma*c0
-            mycfg.append('4232:mayDecay = no')   # Xi+c
-            mycfg.append('4132:mayDecay = no')   # Xi0c
-            mycfg.append('4322:mayDecay = no')   # Xiprimec+
-            mycfg.append('4312:mayDecay = no')   # Xiprimec0
-            mycfg.append('4324:mayDecay = no')   # Xi*c+
-            mycfg.append('4314:mayDecay = no')   # Xi*c0
-            mycfg.append('4332:mayDecay = no')   # Omega0c
-            mycfg.append('4334:mayDecay = no')   # Omega*c0
-            mycfg.append('4412:mayDecay = no')
-            mycfg.append('4422:mayDecay = no')
-            mycfg.append('4414:mayDecay = no')
-            mycfg.append('4424:mayDecay = no')
-            mycfg.append('4432:mayDecay = no')
-            mycfg.append('4434:mayDecay = no')
-            mycfg.append('4444:mayDecay = no')
+            # Bottom Baryons
+            mycfg.append('5122:mayDecay = no')   # Lam0b 
+            mycfg.append('5112:mayDecay = no')   # Sig-b 
+            mycfg.append('5212:mayDecay = no')   # Sig0b
+            mycfg.append('5222:mayDecay = no')   # Sig+b
+            mycfg.append('5114:mayDecay = no')   # Sig*b-
+            mycfg.append('5214:mayDecay = no')   # Sig*b0
+            mycfg.append('5224:mayDecay = no')   # Sig*b+
+            mycfg.append('5132:mayDecay = no')   # Xi-b
+            mycfg.append('5232:mayDecay = no')   # Xi0b
+            mycfg.append('5312:mayDecay = no')   # Xi'b-
+            mycfg.append('5322:mayDecay = no')   # Xi'b0
+            mycfg.append('5314:mayDecay = no')   # Xi*b-
+            mycfg.append('5324:mayDecay = no')   # Xi*b0
+            mycfg.append('5332:mayDecay = no')   # O-b
+            mycfg.append('5334:mayDecay = no')   # O*b-
+            mycfg.append('5142:mayDecay = no')   # Xi0bc
+            mycfg.append('5242:mayDecay = no')   # Xi+bc
+            mycfg.append('5412:mayDecay = no')   # Xi'b0c
+            mycfg.append('5422:mayDecay = no')   # Xi'b+c
+            mycfg.append('5414:mayDecay = no')   # Xi*b0c
+            mycfg.append('5424:mayDecay = no')   # Xi*b+c
+            mycfg.append('5342:mayDecay = no')   # O0bc
+            mycfg.append('5432:mayDecay = no')   # O'b0c
+            mycfg.append('5434:mayDecay = no')   # O*b0c
+            mycfg.append('5442:mayDecay = no')   # O+bcc
+            mycfg.append('5444:mayDecay = no')   # O*b+cc
+            mycfg.append('5512:mayDecay = no')   # Xi-bb
+            mycfg.append('5522:mayDecay = no')   # Xi0bb
+            mycfg.append('5514:mayDecay = no')   # Xi*b-b
+            mycfg.append('5524:mayDecay = no')   # Xi*b0b
+            mycfg.append('5532:mayDecay = no')   # O-bb
+            mycfg.append('5534:mayDecay = no')   # O*b-b
+            mycfg.append('5542:mayDecay = no')   # O0bbc
+            mycfg.append('5544:mayDecay = no')   # O*b0bc
+            mycfg.append('5554:mayDecay = no')   # O-bbb
 
-        if (self.initscat == 1): #if (self.hardccbar):
+
+        if (self.initscat == 1): #if (self.hardbbbar):
             mycfg.append('HardQCD:all = off')
-            mycfg.append('HardQCD:hardccbar = on')
+            mycfg.append('HardQCD:hardbbbar = on')
 
-        elif (self.initscat == 2): #if (self.gg2ccbar):
+        elif (self.initscat == 2): #if (self.gg2bbbar):
             mycfg.append('HardQCD:all = off')
-            mycfg.append('HardQCD:gg2ccbar = on')
+            mycfg.append('HardQCD:gg2bbbar = on')
 
         elif (self.initscat == 3): # just D0->Kpi
+            #manually set it on
             #mycfg.append('HardQCD:all = off')
-            #mycfg.append('HardQCD:hardccbar = on')
-
+            #mycfg.append('HardQCD:hardbbbar = on')
+            
             # Uncomment these lines for Z+jet
-            mycfg.append('HardQCD:all = off')
-            mycfg.append('WeakBosonAndParton:qqbar2gmZg = on')  # q qbar → gamma^*/Z^0 g
-            mycfg.append('WeakBosonAndParton:qg2gmZq = on')     # q g → gamma^*/Z^0 q
+            #mycfg.append('HardQCD:all = off')
+            #mycfg.append('WeakBosonAndParton:qqbar2gmZg = on')  # q qbar → gamma^*/Z^0 g
+            #mycfg.append('WeakBosonAndParton:qg2gmZq = on')     # q g → gamma^*/Z^0 q
 
-            mycfg.append('421:onMode = off')
-            mycfg.append('421:onIfMatch = 321 211')
+            mycfg.append('521:onMode = off')
+            mycfg.append('521:onIfMatch = 443 321') #JPsi to mu mu or keep that decay off(JpsiK as a b)
 
         elif (self.initscat == 4): # hard->bbar with D0 -> (only) Kpi
             mycfg.append('HardQCD:all = off')
             mycfg.append('HardQCD:hardbbbar = on')
+            
 
-            mycfg.append('421:onMode = off')
-            mycfg.append('421:onIfMatch = 321 211')
-
+            mycfg.append('521:onMode = off')
+            mycfg.append('521:onIfMatch = 443 321')
+        '''
+        rdc
+        # What does this if do??
+        # Why do we care about phi meson??
+        
+        # We don't care about phi, this is a feeddown check
+        '''
         if (self.phimeson):
             print("turning phi's OFF")
             mycfg.append('333:mayDecay = no')
             # mycfg.append('100333:mayDecay = no')
             # mycfg.append('337:mayDecay = no')
-
+            
         if (self.replaceKPpairs):
             if (not (self.Dstar or self.D0wDstar or self.difNorm)):
-                print("turning D*'s OFF")
-                mycfg.append('10411:mayDecay = no')
-                mycfg.append('10421:mayDecay = no')
-                mycfg.append('413:mayDecay = no')
-                mycfg.append('423:mayDecay = no')
-                mycfg.append('10413:mayDecay = no')
-                mycfg.append('10423:mayDecay = no')
-                mycfg.append('20413:mayDecay = no')
-                mycfg.append('20423:mayDecay = no')
-                mycfg.append('415:mayDecay = no')
-                mycfg.append('425:mayDecay = no')
-                mycfg.append('431:mayDecay = no')
-                mycfg.append('10431:mayDecay = no')
-                mycfg.append('433:mayDecay = no')
-                mycfg.append('10433:mayDecay = no')
-                mycfg.append('20433:mayDecay = no')
-                mycfg.append('435:mayDecay = no')
+                print("turning lambda b's OFF")
+                
+                mycfg.append('443:mayDecay = no')    # J/Psi
+                mycfg.append('511:mayDecay = no')    # B0
+                mycfg.append('10511:mayDecay = no')  # B*00
+                mycfg.append('10521:mayDecay = no')  # B*0+
+                mycfg.append('513:mayDecay = no')    # B*0
+                mycfg.append('523:mayDecay = no')    # B*+
+                mycfg.append('10513:mayDecay = no')  # B1(L)0
+                mycfg.append('10523:mayDecay = no')  # B1(L)+
+                mycfg.append('20513:mayDecay = no')  # B1(H)0
+                mycfg.append('20523:mayDecay = no')  # B1(H)+
+                mycfg.append('515:mayDecay = no')    # B*20
+                mycfg.append('525:mayDecay = no')    # B*2+
+                mycfg.append('531:mayDecay = no')    # B0s
+                mycfg.append('10531:mayDecay = no')  # B*s00
+                mycfg.append('533:mayDecay = no')    # B*s0
+                mycfg.append('10533:mayDecay = no')  # Bs1(L)0
+                mycfg.append('20533:mayDecay = no')  # Bs1(H)0
+                mycfg.append('535:mayDecay = no')    # B*s02
+                mycfg.append('541:mayDecay = no')    # B+c
+                mycfg.append('10541:mayDecay = no')  # B*c+0
+                mycfg.append('543:mayDecay = no')    # B*c+
+                mycfg.append('10543:mayDecay = no')  # Bc1(L)+
+                mycfg.append('20543:mayDecay = no')  # Bc1(H)+
+                mycfg.append('545:mayDecay = no')    # B*c+2
+                
+                # Bottom Baryons
+                mycfg.append('5122:mayDecay = no')   # Lam0b 
+                mycfg.append('5112:mayDecay = no')   # Sig-b 
+                mycfg.append('5212:mayDecay = no')   # Sig0b
+                mycfg.append('5222:mayDecay = no')   # Sig+b
+                mycfg.append('5114:mayDecay = no')   # Sig*b-
+                mycfg.append('5214:mayDecay = no')   # Sig*b0
+                mycfg.append('5224:mayDecay = no')   # Sig*b+
+                mycfg.append('5132:mayDecay = no')   # Xi-b
+                mycfg.append('5232:mayDecay = no')   # Xi0b
+                mycfg.append('5312:mayDecay = no')   # Xi'b-
+                mycfg.append('5322:mayDecay = no')   # Xi'b0
+                mycfg.append('5314:mayDecay = no')   # Xi*b-
+                mycfg.append('5324:mayDecay = no')   # Xi*b0
+                mycfg.append('5332:mayDecay = no')   # O-b
+                mycfg.append('5334:mayDecay = no')   # O*b-
+                mycfg.append('5142:mayDecay = no')   # Xi0bc
+                mycfg.append('5242:mayDecay = no')   # Xi+bc
+                mycfg.append('5412:mayDecay = no')   # Xi'b0c
+                mycfg.append('5422:mayDecay = no')   # Xi'b+c
+                mycfg.append('5414:mayDecay = no')   # Xi*b0c
+                mycfg.append('5424:mayDecay = no')   # Xi*b+c
+                mycfg.append('5342:mayDecay = no')   # O0bc
+                mycfg.append('5432:mayDecay = no')   # O'b0c
+                mycfg.append('5434:mayDecay = no')   # O*b0c
+                mycfg.append('5442:mayDecay = no')   # O+bcc
+                mycfg.append('5444:mayDecay = no')   # O*b+cc
+                mycfg.append('5512:mayDecay = no')   # Xi-bb
+                mycfg.append('5522:mayDecay = no')   # Xi0bb
+                mycfg.append('5514:mayDecay = no')   # Xi*b-b
+                mycfg.append('5524:mayDecay = no')   # Xi*b0b
+                mycfg.append('5532:mayDecay = no')   # O-bb
+                mycfg.append('5534:mayDecay = no')   # O*b-b
+                mycfg.append('5542:mayDecay = no')   # O0bbc
+                mycfg.append('5544:mayDecay = no')   # O*b0bc
+                mycfg.append('5554:mayDecay = no')   # O-bbb
 
         # print the banner first
         fj.ClusterSequence.print_banner()
@@ -344,6 +447,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
     #---------------------------------------------------------------
     # Initialize histograms
+    
+    # Should not be of problem
     #---------------------------------------------------------------
     def initialize_hist(self):
 
@@ -353,11 +458,15 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             self.wta_durations = []
 
         self.hNevents = ROOT.TH1I("hNevents", 'Number accepted events (unscaled)', 2, -0.5, 1.5)
-        self.hD0Nevents = ROOT.TH1I("hD0Nevents", "Total Number of D0 events (unscaled)", 2, -0.5, 1.5)
-        self.hD0KpiNevents = ROOT.TH1I("hD0KpiNevents", "Number of D0->Kpi events (unscaled)", 2, -0.5, 1.5)
-        self.hD0KpiNjets = ROOT.TH1I("hD0KpiNjets", "Number of D0->Kpi jets (unscaled)", 2, -0.5, 1.5) #accidentally called "hD0KpiNehD0KpiNjetsvents"
-        self.hDstarNjets = ROOT.TH1I("hDstarNjets", "Number of D* jets (unscaled)", 2, -0.5, 1.5)
-        self.hsoftpionpT = ROOT.TH1D("hsoftpionpT", "pT of soft pion from D*", 50, 0, 50)
+        self.hD0Nevents = ROOT.TH1I("hD0Nevents", "Total Number of B+ events (unscaled)", 2, -0.5, 1.5)
+        '''
+        rdc
+        # Do we care about JPsi decay?(for JPsi)
+        '''
+        self.hD0KpiNevents = ROOT.TH1I("hD0KpiNevents", "Number of B+->JPsiK+ events (unscaled)", 2, -0.5, 1.5)
+        self.hD0KpiNjets = ROOT.TH1I("hD0KpiNjets", "Number of B+->JPsiK+ jets (unscaled)", 2, -0.5, 1.5) #accidentally called "hD0KpiNehD0KpiNjetsvents"
+        self.hDstarNjets = ROOT.TH1I("hDstarNjets", "Number of lambda b jets (unscaled)", 2, -0.5, 1.5)
+        self.hsoftpionpT = ROOT.TH1D("hsoftpionpT", "pT of soft pion from Lambda b", 50, 0, 50)
         self.hDeltaR = ROOT.TH1F("hDeltaR", 'Delta R between jet and each parent', 40, 0, 0.4)
 
         if self.phimeson:
@@ -374,7 +483,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
             for observable in self.observable_list:
 
-                if observable not in ["mass", "zg", "theta_g"]:
+                #if observable not in ["mass", "massPtRatio", "zg", "theta_g"]:
+                if observable not in ["massPtRatio"]:
                     raise ValueError("Observable %s is not implemented in this script" % observable)
 
                 obs_name = self.obs_names[observable]
@@ -404,17 +514,20 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     obs_label = self.utils.obs_label(obs_setting, grooming_setting)
                     print("all the settings", obs_setting, grooming_setting, obs_label)
 
-                    partontypeslist = ["charm"] #, "light", "gluon", "inclusive"]
+                    partontypeslist = ["beauty"]#,charm"] #, "light", "gluon", "inclusive"]
                     #if (self.initscat == 4):
                     #    partontypeslist.append("beauty")
 
                     for parton_type in partontypeslist:
 
-                        title = [ '#it{p}_{T}^{ch jet}', '#it{p}_{T}^{D^{0}}', obs_name]
+                        title = [ '#it{p}_{T}^{bt jet}', '#it{p}_{T}^{B^{+}}', obs_name]
 
                         # make TH3D for observable
                         name = ('h3D_%s_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
                             len(obs_label) else ('h3D_%s_JetPt_%s_R%s' % (observable, parton_type, jetR))
+                        
+                        
+                        print(name)
                         h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
                         h3D.Sumw2()
                         h3D.GetXaxis().SetTitle(title[0])
@@ -434,7 +547,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                         getattr(self, hist_list_name).append(h3D)
 
                         # jetflav IRC-safe algorithms
-                        for algo_name in ["JADE", "WTA", "IFN", "CMP", "GHS"]:
+                        for algo_name in ["nfakt","modakt","JADE", "WTA", "IFN", "CMP", "GHS"]:
                             name = ('h3D_%s_%s_JetPt_%s_R%s_%s' % (observable, algo_name, parton_type, jetR, obs_label)) if \
                                 len(obs_label) else ('h3D_%s_%s_JetPt_%s_R%s' % (observable, algo_name, parton_type, jetR))
                             h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
@@ -485,6 +598,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
     #---------------------------------------------------------------
     # Calculate events and pass information on to jet finding
+    # B+ not calculated?
     #---------------------------------------------------------------
     def calculate_events(self, pythia):
 
@@ -499,12 +613,20 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             self.event = pythia.event
 
             # Check if the event contains desired parton, else continue
-            desired_pid = [4] #, 5] # charm, bottom quark
+            '''
+            rdc
+            # In our case we would only want b quark right?
+            # Leave it to be both for now
+            
+            # just keep bottom
+            '''
+            desired_pid = [5] # charm, bottom quark
             desired_parton_found = False
             for parton in pythia.event:
                 if parton.id() in desired_pid:
                     if (self.min_eta_hadron - 1) <= abs(parton.eta()) <= (self.max_eta_hadron + 1):
                         desired_parton_found = True
+                        #print("\nfound b quark!!!\n")
                         break
             if not desired_parton_found:
                 self.parton_counter += 1
@@ -513,27 +635,32 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             #if True not in is_desired_parton:
             #    continue
 
-            # print(self.event) # to print out a table of the event information
-            fs_parton_5 = fj.PseudoJet(pythia.event[5].px(), pythia.event[5].py(), pythia.event[5].pz(), pythia.event[5].e())
-            fs_parton_6 = fj.PseudoJet(pythia.event[6].px(), pythia.event[6].py(), pythia.event[6].pz(), pythia.event[6].e())
+            #print(self.event) # to print out a table of the event information
+            fs_parton_5 = fj.PseudoJet(pythia.event[5].px(), pythia.event[5].py(),
+                                       pythia.event[5].pz(), pythia.event[5].e())
+            fs_parton_6 = fj.PseudoJet(pythia.event[6].px(), pythia.event[6].py(),
+                                       pythia.event[6].pz(), pythia.event[6].e())
             self.parents = [fs_parton_5, fs_parton_6] # parent partons in dijet
 
             # Save PDG code of the parent partons
             self.parent_ids = [pythia.event[5].id(), pythia.event[6].id()]
-
+            #print(str(self.parent_ids[0])+" "+str(self.parent_ids[1]))
             # parton level
             parts_pythia_p = pythiafjext.vectorize_select(pythia, vector[int]([pythiafjext.kFinal]), 0, True)
 
             # Get hadron-level event
-            require_pid = 421      # D0 particle ID
+            require_pid = 521      # B+ particle ID
             daughters_size = -1    # require certain number of daughters (disabled = -1)
             if self.Dstar:
-                require_pid = 413
-                dauthers_size = 2
+                require_pid = 5122
+                daughters_size = 2
             elif self.replaceKPpairs:  # D0 or D0-with-D*
-                dauthers_size = 2
+                daughters_size = 2
             elif self.phimeson:
                 require_pid = 333  # phi meson particle ID
+                
+            #print(require_pid)
+            #print(daughters_size)
 
             # If successful, returns index of the satisfiying particle in the event, else -1
             satisfier_ip = pythiafjext.update_hadronization(pythia, require_pid, daughters_size)
@@ -546,11 +673,11 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 # print("There are ", len(old_pythia_hch), "in oph, and ", len(phis_pythia_hch), " in phis", len(parts_pythia_hch), ">
             else: #replace D0->Kpi
                 if ( self.softpion_action != 1):
-                    parts_pythia_h = pythiafjext.vectorize_select_replaceD0(pythia, vector[int]([pythiafjext.kFinal]), 0, True)
+                    parts_pythia_h = pythiafjext.vectorize_select_replaceBp(pythia, vector[int]([pythiafjext.kFinal]), 0, True)
                 else:
-                    parts_pythia_h = pythiafjext.vectorize_select_replaceD0(pythia, vector[int]([pythiafjext.kFinal]), 0, True, True)
-
-            # print("!! pythia hadron (before vectorization) event size is ", pythia.event.size())
+                    parts_pythia_h = pythiafjext.vectorize_select_replaceBp(pythia, vector[int]([pythiafjext.kFinal]), 0, True, True)
+            #print("!! pythia hadron (after vectorization) event size is ", len(parts_pythia_h))    
+            #print("!! pythia hadron (before vectorization) event size is ", pythia.event.size())
             # eventcounter = 0
             # for event in pythia.event:
             #     # if event.id() == 111 or event.id() == 211 or event.id() == -211: #pi0 or pi+ or pi-
@@ -572,9 +699,9 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     parts_pythia_hch = pythiafjext.vectorize_select(pythia, vector[int]([pythiafjext.kFinal, pythiafjext.kCharged]), 0, True)
             else: #replace D0->Kpi
                 if ( self.softpion_action != 1):
-                    parts_pythia_hch = pythiafjext.vectorize_select_replaceD0(pythia, vector[int]([pythiafjext.kFinal, pythiafjext.kCharged]), 0, True)
+                    parts_pythia_hch = pythiafjext.vectorize_select_replaceBp(pythia, vector[int]([pythiafjext.kFinal, pythiafjext.kCharged]), 0, True)
                 else:
-                    parts_pythia_hch = pythiafjext.vectorize_select_replaceD0(pythia, vector[int]([pythiafjext.kFinal, pythiafjext.kCharged]), 0, True, True)
+                    parts_pythia_hch = pythiafjext.vectorize_select_replaceBp(pythia, vector[int]([pythiafjext.kFinal, pythiafjext.kCharged]), 0, True, True)
             # print("Size of 1 vector", len(parts_pythia_hch_noreplace))
             # print("Size of 2 vector", len(parts_pythia_hch_replaced))
             # print("Size of new vector", len(parts_pythia_hch))
@@ -587,22 +714,26 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             D0Kpidecayfound = False
             phifound = False
             self.DstarKpipidecayfound = False
-            #for ip in range(satisifer_ip, len(self.event)):
+            
+            #for ip in range(satisfier_ip, len(self.event)):
             particle = self.event[satisfier_ip]
-            if abs(particle.id()) == 421 and self.min_eta_hadron <= abs(particle.eta()) <= self.max_eta_hadron: #D0
+                    
+                    
+            if abs(particle.id()) == 521 and self.min_eta_hadron <= abs(particle.eta()) <= self.max_eta_hadron: #D0
                 D0found = True
                 decayChannel = self.checkDecayChannel(particle, self.event)
                 if decayChannel == EMesonDecayChannel.kDecayD0toKpi:
                     #print("D0 eta:", particle.eta(), "// D0 pT:",
-                    #    math.sqrt(particle.px()*particle.px() + particle.py()*particle.py()))
+                        #math.sqrt(particle.px()*particle.px() + particle.py()*particle.py()))
                     D0Kpidecayfound = True
+                    #print(D0Kpidecayfound)
                 if decayChannel == EMesonDecayChannel.kDecayDStartoKpipi:
                     self.DstarKpipidecayfound = True
-            elif abs(particle.id()) == 413: # D*
+            elif abs(particle.id()) == 5122: # D*
                 self.DstarKpipidecayfound = True
             elif abs(particle.id()) == 333: # phi
                 phifound = True
-
+                
             #if D0->Kpi found, count the events; if not, check that length of charged final state hadrons vector is 0
             if (D0Kpidecayfound):
                 self.hD0KpiNevents.Fill(0)
@@ -614,6 +745,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             # Some "accepted" events don't survive hadronization step -- keep track here
             self.hNevents.Fill(0)
             self.find_jets_fill_histograms(parts_pythia_h, parts_pythia_hch, iev, D0Kpidecayfound)
+            
 
             if (iev%100 == 0):
                 print("Event", iev)
@@ -651,10 +783,17 @@ class PythiaQuarkGluon(process_base.ProcessBase):
     #---------------------------------------------------------------
     def find_jets_fill_histograms(self, parts_pythia_h, parts_pythia_hch, iev, D0Kpidecayfound):
 
+        #print("B+JPsiK+ decay channel found: " + str(D0Kpidecayfound))
+        #print("replaceKPpairs on:"+str(self.replaceKPpairs))
+        #print("phi meson on:"+str(self.phimeson))
+        
         # Don't waste time if there are no D0 mesons
         if not D0Kpidecayfound:
             return
-
+        '''
+        # h is for hadron
+        # ch is for charged hadron
+        '''
         parts_selector_h = getattr(self, "parts_selector_h")
         parts_selector_ch = getattr(self, "parts_selector_ch")
 
@@ -681,8 +820,9 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             # print("!! length of jets_ch", len(jets_ch))
 
             R_label = str(jetR).replace('.', '') + 'Scaled'
-
-            ''' Matching jet to parent parton
+            
+            '''
+            # Matching jet to parent parton
             # Find the charged jet closest to the axis of the original parton
             # Require that the match is within some small angle, and that it is unique
             jet_matching_distance = 0.6  # Match jets with deltaR < jet_matching_distance*jetR
@@ -744,7 +884,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 #                print("passed not jet")
                 parton_id = self.parent_ids[i_parent]
                 # print("parton_id is ", parton_id)
-                parton_types = []
+                parton_types = [5]
                 if parton_id in self.quark_pdg_ids:
                     # parton_types += ["quark"]
                     if parton_id in self.charm_pdg_ids:
@@ -778,18 +918,50 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 D0taggedjet = False
                 N_D0 = 0
                 Dstartaggedjet = False
+                netflav = 0;
+                modflav = 0;
+                mod_tagged = False;
+                nf_tagged = False;
+                
                 if ( self.replaceKPpairs ):
                     # print("There are ", len(jet.constituents()), "constituents.")
+                    # print("\nnew\n")
+                    
                     for c in jet.constituents():
+                        constituent_pdg_id = pythiafjext.getPythia8Particle(c).id()
                         constituent_pdg_idabs = pythiafjext.getPythia8Particle(c).idAbs()
                         constituent_pdg_index = c.user_index()
-                        if (constituent_pdg_idabs == 421):
+                        
+                        #write a algorithm that filters out the counts of b quarks here
+                        if (constituent_pdg_id == 521):
+                            # if there is a B+, net flavor +1
+                            netflav -= 1;
+                            # if there is a B, B count +1
+                            modflav += 1;
+                        #modular flav is overcounting
+                        #seperate and investigate why it is greater than akt
+                        #first look at root macro, make sure it is correct
+                        #turning things off in the script until things work correctly
+                        elif (constituent_pdg_id == -521):
+                            # if there is a B-, netflav -1
+                            netflav += 1;
+                            # if there is a B, B count +1
+                            modflav += 1;
+                        
+                        #print("constituent_pdg_idabs = "+str(constituent_pdg_idabs)+"\n")
+
+                        if (constituent_pdg_idabs == 521):
+                            
                             decayChannel = self.checkDecayChannel(pythiafjext.getPythia8Particle(c), self.event)
+                            #print(constituent_pdg_idabs)
+                            #print(" ")
                             if (decayChannel == EMesonDecayChannel.kDecayD0toKpi):
                                 self.getD0Info(pythiafjext.getPythia8Particle(c))
                                 N_D0 += 1
                                 D0taggedjet = True
+                                #print('____________________\nfound b+ jets\n______________________')
                                 #break
+                                
                             elif (decayChannel == EMesonDecayChannel.kDecayDStartoKpipi):
                                 self.getD0Info(pythiafjext.getPythia8Particle(c))
                                 Dstartaggedjet = True
@@ -810,20 +982,34 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                                         self.D0particleinfo_psjet = self.getParticleAsPseudojet(self.event[constituent_pdg_index])#self.D0particleinfo)
 
                                 break
-
+                    #print("netflav = %i" % netflav)
+                    #print("modflav = %i" % modflav)
+                    
+                    # if net flavor = 1, that net flavor is b+
+                    if (netflav != 0):
+                        nf_tagged = True
+                        #print("nf_tagged True")
+                    
+                    # if modular b hadron number is not 0, there is one b hadron in the jet 
+                    if ((modflav%2) != 0):
+                        mod_tagged = True
+                        #print("mod_tagged True")
+                        
+                        
+                    #print("\n")       
                     # Skip jets that are not dtagged or dstar tagged
                     if not (D0taggedjet or Dstartaggedjet):
                         #print("continuing......")
                         continue
                     elif N_D0 > 1:
-                        print("Found %i D0 particles in this jet, continuing" % N_D0)
+                        print("Found %i B+ particles in this jet, continuing" % N_D0)
                         continue
 
                     # Select D* jets when required
                     if ( self.difNorm == False ):
                         if ( not self.Dstar and not self.D0wDstar ):
                             if ( not D0taggedjet ): #if not a D0 tagged jet, move to next jet
-                                print("Dstar is false, D0wDstar is false, and this is not D0tagged jet")
+                                print("Lambab0 is false, B+wLambdab0 is false, and this is not D0tagged jet")
                                 continue
                         if ( self.Dstar and not Dstartaggedjet ): #if only looking at D*s and D* is not tagged, move to next jet
                             # print("Dstar is true and Dstar is not tagged")
@@ -835,7 +1021,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     #     print("prompt???", self.promptness)
 
                 phitaggedjet = False
-                # print("There are ", len(jet.constituents()), "constituents.")    
+                # print("There are ", len(jet.constituents()), "constituents.")
+  
                 if (self.phimeson):
                     for c in jet.constituents():
                         constituent_pdg_idabs = pythiafjext.getPythia8Particle(c).idAbs()
@@ -883,32 +1070,45 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     if ld.z() > JADE_SD_ZCUT * (ld.Delta() / jetR) ** JADE_SD_BETA:  # SD condition
                         jet_gr_jade = ld.pair()
                         break
+                    
                 if jet_gr_jade.has_constituents() and jet_gr_jade.has_structure():
-                    # Look for a D0 inside the jet
+                    # Look for a B+ inside the jet
                     for constit in jet_gr_jade.constituents():
                         pid_abs = pythiafjext.getPythia8Particle(constit).idAbs()
                         pid_abs_str = str(pid_abs)
-                        if pid_abs == 421:
+                        if pid_abs == 521:
                             #n_HF_meson_found += 1
                             jade_tagged = True
                             continue
-                        elif (len(pid_abs_str) >= 3 and pid_abs_str[-3] == '4') or \
-                            (len(pid_abs_str) >= 4 and pid_abs_str[-4] == '4'):
-                            # Jet has some non-D0 charm -- untag
+                        elif (len(pid_abs_str) >= 3 and pid_abs_str[-3] == '5') or \
+                            (len(pid_abs_str) >= 4 and pid_abs_str[-4] == '5'):
+                            # Reject jets that does not contain b+
+                            #n_HF_meson_found += 1
                             jade_tagged = False
                             break
+                        
+                # rdc
+                # Reject jets with b hadron>1
                 #if n_HF_meson_found == 1:
-                #   jade_tagged = True
+                   #jade_tagged = True
+                
                 if self.make_durations:
                     self.jade_durations.append(time.time() - start_time_jade)
 
                 ##############################################################
-                # WTA RECLUSTERING
+                # WTA RECLUSTERING(winner takes all)
                 start_time_wta = 0
                 if self.make_durations:
                     start_time_wta = time.time()
                 wta_tagged = False
                 # fastjet::max_allowable_R == 1000.0
+                '''
+                rdc
+                # at which unit?
+                
+                # rapidity+azimuthal angle plane, y^2 + phi^2
+                # 1000 is the max allowable R for clustering
+                '''
                 jet_def_wta = fj.JetDefinition(fj.cambridge_algorithm, 1000.0)
                 jet_def_wta.set_recombination_scheme(fj.WTA_pt_scheme)
                 recluster_wta = fj.contrib.Recluster(jet_def_wta)
@@ -918,7 +1118,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     for constit in jet_wta.constituents():
                         if constit.delta_R(jet_wta) < 1e-8:
                             # Particle found
-                            if pythiafjext.getPythia8Particle(constit).idAbs() == 421:
+                            if pythiafjext.getPythia8Particle(constit).idAbs() == 521:
                                 wta_tagged = True
                             break
                 if self.make_durations:
@@ -956,7 +1156,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                             zcut = grooming_setting['sd'][0]
                             beta = grooming_setting['sd'][1]
                             lg = fj.contrib.LundGenerator(self.reclustering_algorithm)
-                            for ld in lg.result(jet):  # Vector of LundDeclustering
+                            for ld in lg.result(jet):  # Vector of LundDeclustering (reclustered with JADE)
                                 if ld.z() > zcut * (ld.Delta() / jetR) ** beta:  # SD condition
                                     jet_groomed_lund = ld
                                     break
@@ -985,8 +1185,13 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                         obs = self.calculate_observable(
                             observable, jet, jet_groomed_lund, jetR, obs_setting,
                             grooming_setting, obs_label, jet.pt())
-
-                        for parton_type in ["charm"]: # parton_types:
+                        
+                        '''
+                        rdc
+                        # correct def parton_types list here??
+                        # only bottom
+                        '''
+                        for parton_type in ["beauty"]: # parton_types:
                             #fill parton hnsparse info
                             if (self.replaceKPpairs or self.phimeson): # phimeson has bad naming convention but is properly filled here
                                 D0_px = self.D0particleinfo.px()
@@ -999,18 +1204,29 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                             getattr(self, ('h3D_%s_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
                                 len(obs_label) else ('h3D_%s_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
                                 jet.pt(), D0_pt, obs)
-
+                                
+                            if nf_tagged:
+                                getattr(self, ('h3D_%s_nfakt_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
+                                    len(obs_label) else ('h3D_%s_nfakt_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
+                                    jet.pt(), D0_pt, obs)
+                                    
+                            if mod_tagged:
+                                getattr(self, ('h3D_%s_modakt_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
+                                    len(obs_label) else ('h3D_%s_modakt_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
+                                    jet.pt(), D0_pt, obs)
+                                
+                            
                             # Custom tagged jets
                             if jade_tagged:
                                 getattr(self, ('h3D_%s_JADE_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
                                     len(obs_label) else ('h3D_%s_JADE_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
                                     jet.pt(), D0_pt, obs)
-
+                                    
                             if wta_tagged:
                                 getattr(self, ('h3D_%s_WTA_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
                                     len(obs_label) else ('h3D_%s_WTA_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
                                     jet.pt(), D0_pt, obs)
-
+                                  
             # jetflav IRC-safe jets
             if self.replaceKPpairs or self.phimeson:
                 pdg_ids = [pythiafjext.getPythia8Particle(p).id() for p in parts_pythia_h]
@@ -1027,19 +1243,21 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
                 jets_h_IFN = fj.sorted_by_pt(jet_selector(jet_def_IFN(parts_selector_h(parts_pythia_h))))
 
-                for i_jh, jet in enumerate(jets_h_IFN):
-                    self.get_flav_fill_histograms(jet, jetR, "IFN")
-
+                #The fourth arg turn on/off(True/False) jet constituent selector
+                #self.one_h_flav_event_selector(jets_h_IFN, jetR, "IFN", True)
+                self.one_h_flav_event_selector(jets_h_IFN, jetR, "IFN", False)
+                            
                 # GHS jets
                 GHS_alpha = 1;  GHS_omega = 2;  # GHS constants
                 for ip, p in enumerate(parts_pythia_h):  # Reset user info
                     p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
                 jets_h_GHS_base = jet_selector(jet_def_base(parts_selector_h(parts_pythia_h)))
                 jets_h_GHS = fj.sorted_by_pt(fj.contrib.run_GHS(jets_h_GHS_base, self.jetptcut, GHS_alpha, GHS_omega, flav_recombiner))
-
-                for i_jh, jet in enumerate(jets_h_GHS):
-                    self.get_flav_fill_histograms(jet, jetR, "GHS")
-
+                
+                #The fourth arg turn on/off(True/False) jet constituent selector
+                #self.one_h_flav_event_selector(jets_h_GHS, jetR, "GHS", True)
+                self.one_h_flav_event_selector(jets_h_GHS, jetR, "GHS", False)
+                
                 # CMP jets
                 CMP_a = 0.1  # 'a' parameter in:   kappa_ij = 1/a * (kT_i^2 + kT_j^2) / (2*kT_max^2)
                 CMP_corr = fj.CMPPlugin.CorrectionType.OverAllCoshyCosPhi_a2  # IRC-safe correction
@@ -1051,21 +1269,72 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 for ip, p in enumerate(parts_pythia_h):  # Reset user info
                     p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
                 jets_h_CMP = fj.sorted_by_pt(jet_selector(jet_def_CMP(parts_selector_h(parts_pythia_h))))
-
-                for i_jh, jet in enumerate(jets_h_CMP):
-                    self.get_flav_fill_histograms(jet, jetR, "CMP")
+                
+                #The fourth arg turn on/off(True/False) jet constituent selector
+                #self.one_h_flav_event_selector(jets_h_CMP, jetR, "CMP", True)
+                self.one_h_flav_event_selector(jets_h_CMP, jetR, "CMP", False)
 
             setattr(self, "count1_R%s" % jetR_str, count1)
             setattr(self, "count2_R%s" % jetR_str, count2)
-
+    #---------------------------------------------------------------
+    # Check and keep events with only one hadron for flavored algo
+    #---------------------------------------------------------------
+    def one_h_flav_event_selector(self, jets, jetR, algo, if_tag):
+        if if_tag==True:
+            for i_jh, jet in enumerate(jets):
+                if jet.has_constituents() and jet.has_structure():
+                    algo_tagged = False
+                    # Look for a B+ inside the jet
+                    for constit in jet.constituents():
+                        flav_info = fj.contrib.FlavHistory.current_flavour_of(constit)
+                        pid_abs = abs(flav_info.pdg_code())
+                        pid_abs_str = str(pid_abs)
+                        if pid_abs == 521:
+                            algo_tagged = True
+                            continue
+                        elif (len(pid_abs_str) >= 3 and pid_abs_str[-3] == '5') or \
+                            (len(pid_abs_str) >= 4 and pid_abs_str[-4] == '5'):
+                            # Jet has some non-Bp charm -- untag
+                            algo_tagged = False
+                            break
+                            
+                if algo_tagged==True:
+                    self.get_flav_fill_histograms(jet, jetR, algo)
+        else:
+            for i_jh, jet in enumerate(jets):
+                    self.get_flav_fill_histograms(jet, jetR, algo)
+                
+        '''
+        for i_jh, jet in enumerate(jets_h_IFN):
+                if jet.has_constituents() and jet.has_structure():
+                    IFN_tagged=False
+                    # Look for a B+ inside the jet
+                    for constit in jet.constituents():
+                        flav_info = fj.contrib.FlavHistory.current_flavour_of(constit)
+                        pid_abs = abs(flav_info.pdg_code())
+                        pid_abs_str = str(pid_abs)
+                        if pid_abs == 521:
+                            IFN_tagged = True
+                            continue
+                        elif (len(pid_abs_str) >= 3 and pid_abs_str[-3] == '5') or \
+                            (len(pid_abs_str) >= 4 and pid_abs_str[-4] == '5'):
+                            # Jet has some non-Bp charm -- untag
+                            IFN_tagged = False
+                            break
+                            
+                if IFN_tagged==True:
+                    self.get_flav_fill_histograms(jet, jetR, "IFN")
+        '''   
     #---------------------------------------------------------------
     # Get IRC-safe jet flavor and fill appropriate histograms
     #---------------------------------------------------------------
     def get_flav_fill_histograms(self, jet, jetR, algo_name):
 
         flav = fj.contrib.FlavHistory.current_flavour_of(jet).description()
-        charm_tagged = 'c' in flav
+        charm_tagged = 'b' in flav
         if not charm_tagged:
+            #print('NOT b tagged\n')
+            #print(flav)
             return
 
         # Save D0 info -- TODO: check for D*
@@ -1077,9 +1346,9 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 flav_info = fj.contrib.FlavHistory.current_flavour_of(c)
                 pdg_idabs = abs(flav_info.pdg_code())
                 pdg_ids.append(pdg_idabs)
-                if (pdg_idabs == 421):
+                if (pdg_idabs == 521):
                     D0meson = c
-            if not D0meson:  # There is charm but not D0
+            if not D0meson:  # There is bottom but not b+
                 return
 
         # Fill histograms
@@ -1099,7 +1368,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     zcut = grooming_setting['sd'][0]
                     beta = grooming_setting['sd'][1]
                     lg = fj.contrib.LundGenerator(self.reclustering_algorithm)
-                    for ld in lg.result(jet):  # Vector of LundDeclustering
+                    for ld in lg.result(jet):  # Vector of LundDeclustering (reclustered with C/A)
                         if ld.z() > zcut * (ld.Delta() / jetR) ** beta:  # SD condition
                             jet_groomed_lund = ld
                             break
@@ -1116,7 +1385,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     observable, jet, jet_groomed_lund, jetR, obs_setting,
                     grooming_setting, obs_label, jet.pt())
 
-                for parton_type in ["charm"]: # parton_types:
+                for parton_type in ["beauty"]: # parton_types:
+                    #print("getting B+ info")
                     #fill parton hnsparse info
                     if (self.replaceKPpairs or self.phimeson): # phimeson has bad naming convention but is properly filled here
                         D0_px = D0meson.px()
@@ -1133,6 +1403,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
     #---------------------------------------------------------------
     # Calculate the observable given a jet
     #---------------------------------------------------------------
+
     def calculate_observable(self, observable, jet, jet_groomed_lund,
         jetR, obs_setting, grooming_setting, obs_label, jet_pt_ungroomed):
 
@@ -1148,11 +1419,25 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     return j_groomed.m()
 
             return jet.m()
+        
+        #rdc
+        elif observable == "massPtRatio":
+            
+            j_massPtRatio = jet.m()/jet_pt_ungroomed
+            
+            if grooming_setting:
+                j_groomed = jet_groomed_lund.pair()
+                if not j_groomed.has_constituents():
+                    return -1
+                else:
+                    j_massPtRatio_groomed = j_groomed.m()/jet_pt_ungroomed
+                    return j_massPtRatio_groomed
+                
+            return j_massPtRatio
 
-        # Groomed jet radius
         elif observable == "theta_g":
-
             if not grooming_setting:
+                
                 raise ValueError("Cannot calculate theta_g without grooming, check config")
             j_groomed = jet_groomed_lund.pair()
             if not j_groomed.has_constituents():
@@ -1178,6 +1463,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
     def checkDecayChannel(self, particle, event): #(part, mcArray): # what type is part
 
         if(not event):
+            #print("EMesonDecayChannel.kUnknownDecay")
             return EMesonDecayChannel.kUnknownDecay
 
         decay = EMesonDecayChannel.kUnknownDecay
@@ -1198,10 +1484,14 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
             absPdg1 = d1.idAbs()
             absPdg2 = d2.idAbs()
-
-            if(absPdgPart == 421):  # D0 -> K pi
-                if((absPdg1 == 211 and absPdg2 == 321) or (absPdg1 == 321 and absPdg2 == 211)): # pi K or K pi - QUESTION: does this account for k and pi being opposite signs?
+            '''
+            rdc
+            # defining decay channel B+(521) -> J/psi(443) K+(321)
+            '''
+            if(absPdgPart == 521):  # D0 -> K pi
+                if((absPdg1 == 443 and absPdg2 == 321) or (absPdg1 == 321 and absPdg2 == 443)): # J/psi K or K J/psi - QUESTION: does this account for k and pi being opposite signs?
                     decay = EMesonDecayChannel.kDecayD0toKpi
+                    #print("EMesonDecayChannel.kDecayD0toKpi")
 
             # TODO: can insert if (self.Dstar) later
 
@@ -1216,7 +1506,13 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 mother = event[mother_index]
                 absPdg_mother = mother.idAbs()
 
-                if (absPdg_mother == 413): # if mother is D*+/-
+                
+                '''rdc
+                # if mother is lamb0
+                
+                # turn of lamb0''' 
+
+                '''if (absPdg_mother == 5122): # if mother is D*+/-
                     # if (len(mother_indices != 1)):
                     #     print("There were", len(mother_indices), "mothers in this event!")
                     # look at daughters of mother
@@ -1230,10 +1526,10 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                         absPdg1 = d1.idAbs()
                         absPdg2 = d2.idAbs()
 
-                        if((absPdg1 == 421 and absPdg2 == 211) or (absPdg1 == 211 and absPdg2 == 421)): # D0 pi or pi D0
+                        
+                        if((absPdg1 == 521 and absPdg2 == 211) or (absPdg1 == 211 and absPdg2 == 521)): # D0 pi or pi D0
                             decay = EMesonDecayChannel.kDecayDStartoKpipi
-                            break #TODO: should this break be earlier? is it possible to have multiple mothers that are D*?
-
+                            break #TODO: should this break be earlier? is it possible to have multiple mothers that are D*?'''
             # print(event)
 
         return decay
@@ -1256,6 +1552,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
 
     # check if D0 is prompt - should only send D0 that does not come from D* here
     # also assuming that D0's mother is c (direct mother, not with other generations in between)
+    
+    #not needed
     def checkPrompt(self, D0particle, event):
 
         promptness = Promptness.kUnknown
@@ -1270,7 +1568,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             absPdg_mother = mother.idAbs()
             print("D0 mother ID", absPdg_mother)
 
-            if (absPdg_mother == 4): #charm
+            if (absPdg_mother == 5): #bottom
                 # check if mother of charm is beauty
                 charms_mother_indices = mother.motherList()
                 print("charm's mothers", charms_mother_indices)
@@ -1295,7 +1593,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 break
 
         return promptness
-
+    #not needed
     def printD0mothers(self, particle, event, num):
         # if num == 10: #break statement
         #         print("Exited with num=10 ")
@@ -1324,20 +1622,22 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             self.printD0mothers(mother, event, num+1)
 
     # check if D0's mother is D*
+    # not needed
     def checkD0motherIsDstar(self, D0particle, event):
         motherisDstar = False
 
-        if (D0particle.idAbs() == 421): #D0
+        if (D0particle.idAbs() == 521): #B+
 
             mother_indices = D0particle.motherList()
             if len(mother_indices) == 1: # assuming D* is the only mother to D0
                 mo1 = mother_indices[0]
-                if event[mo1].idAbs() == 413: #D*
+                if event[mo1].idAbs() == 5122: #lambda b
                     motherisDstar = True
 
         # std::cout << "is mother a Dstar?  " << motherisDstar << std::endl;
         return motherisDstar
-
+    
+    # not needed
     def getSoftPion(self, D0particle, event, jet_const_arr):
         softpion_index = -1
 
@@ -1362,6 +1662,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
     # Initiate scaling of all histograms and print final simulation info
     #---------------------------------------------------------------
     def scale_print_final_info(self, pythia):
+        
+        
         # Scale all jet histograms by the appropriate factor from generated cross section and the number of accepted events
         scale_f = pythia.info.sigmaGen() / self.hNevents.GetBinContent(1)
         print("pythia.info.sigmaGen() is", pythia.info.sigmaGen())
@@ -1375,7 +1677,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             #     if 'jetlevel' in h.GetTitle():
             #         continue
                 h.Scale(scale_f)
-
+        
         N_rejected_hadron = int(pythia.info.nAccepted() - self.hNevents.GetBinContent(1))
         print("N total final events:", int(self.hNevents.GetBinContent(1)), "with",
               self.parton_counter, "events rejected at parton selection and",
@@ -1396,7 +1698,11 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                       sum(self.jade_durations) / len(self.jade_durations) * 1000))
             print("Average time on WTA tagging: %f milliseconds per jet" % (
                       sum(self.wta_durations) / len(self.wta_durations) * 1000))
-
+            
+        end_time_overall = time.time()
+        duration = end_time_overall - start_time_overall
+        print("--------\nruntime is %f\n" % (duration))
+        print("--------")
 ################################################################
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='pythia8 fastjet on the fly',
@@ -1408,28 +1714,33 @@ if __name__ == '__main__':
                         help='Output directory for generated ROOT file(s)')
     parser.add_argument('--tree-output-fname', default="AnalysisResults.root", type=str,
                         help="Filename for the (unscaled) generated particle ROOT TTree")
+    ##multi-parton interaction
     parser.add_argument('--MPIon', action='store', type=int, default=1,
                         help="MPI on or off")
+    ##initial state radiation
     parser.add_argument('--ISRon', action='store', type=int, default=1,
                         help="ISR on or off")
-    parser.add_argument('-c', '--config_file', action='store', type=str, default='config/angularity.yaml',
+    parser.add_argument('-c', '--config_file', action='store', type=str, default='config/mass_zg_thetag.yaml',
                         help="Path of config file for observable configurations")
-    parser.add_argument('--nocharmdecay', action='store', type=int, default=0, help="'1' turns charm decays off")
+    parser.add_argument('--nobeautydecay', action='store', type=int, default=0, help="'1' turns beauty decays off")
     parser.add_argument('--weightON', action='store', type=int, default=0, help="'1' turns weights on")
     parser.add_argument('--leadingptcut', action='store', type=float, default=0, help="leading track pt cut")
-    parser.add_argument('--replaceKP', action='store', type=int, default=0, help="'1' replaces the K/pi pairs with D0")
-    parser.add_argument('--onlygg2ccbar', action='store', type=int, default=0, help="'1' runs only gg->ccbar events, '0' runs all events")
-    parser.add_argument('--onlyccbar', action='store', type=int, default=0, help="'1' runs only hard->ccbar events, '0' runs all events")
-    parser.add_argument('--DstarON', action='store', type=int, default=0, help="'1' looks at EEC for D* only")
+    parser.add_argument('--replaceKP', action='store', type=int, default=0, help="'1' replaces the K/pi pairs with D0")#
+    parser.add_argument('--onlygg2bbbar', action='store', type=int, default=0, help="'1' runs only gg->bbbar events, '0' runs all events")#
+    parser.add_argument('--onlybbbar', action='store', type=int, default=0, help="'1' runs only hard->bbbar events, '0' runs all events")#
+    parser.add_argument('--DstarON', action='store', type=int, default=0, help="'1' looks at EEC for D* only")#
+    '''
+    do I run 0 for this?
+    '''
     parser.add_argument('--chinitscat', action='store', type=int, default=0, help="'0' runs all events, \
-                        '1' runs only hard->ccbar events, '2' runs only gg->ccbar events, '3' runs only D0->Kpi events")
-    parser.add_argument('--D0withDstarON', action='store', type=int, default=0, help="'1' looks at EEC for D0 and D0 from D*")
-    parser.add_argument('--difNorm', action='store', type=int, default=0, help="'1' normalizes D* with (D0+D*)")
+                        '1' runs only hard->bbbar events, '2' runs only gg->bbbar events, '3' runs only D0->Kpi events")
+    parser.add_argument('--D0withDstarON', action='store', type=int, default=0, help="'1' looks at EEC for D0 and D0 from D*")#
+    parser.add_argument('--difNorm', action='store', type=int, default=0, help="'1' normalizes D* with (D0+D*)")#
     parser.add_argument('--softpion', action='store', type=int, default=0, help="'1' removes the soft pion from D* distribution, \
                         '2' gets only pairs of soft pion w other charged particles,'3' gets only the pair of soft pion with D0, \
-                        '4' gives soft pion with everything")
-    parser.add_argument('--giveptRL', action='store', type=int, default=0, help="'1' changes THnSparse to calculate pT*RL (instead of RL)")
-    parser.add_argument('--runphi', action='store', type=int, default=0, help="'1' looks at the phi meson (not allowed to decay)")
+                        '4' gives soft pion with everything")#
+    parser.add_argument('--giveptRL', action='store', type=int, default=0, help="'1' changes THnSparse to calculate pT*RL (instead of RL)")#
+    parser.add_argument('--runphi', action='store', type=int, default=0, help="'1' looks at the phi meson (not allowed to decay)")#
 
 
     args = parser.parse_args()
@@ -1448,7 +1759,7 @@ if __name__ == '__main__':
     if args.nev < 1:
         args.nev = 1
 
-    print("args for charmdecay", args.nocharmdecay)
+    print("args for beautydecay", args.nobeautydecay)
 
     process = PythiaQuarkGluon(config_file=args.config_file, output_dir=args.output_dir, args=args)
     process.pythia_quark_gluon(args)

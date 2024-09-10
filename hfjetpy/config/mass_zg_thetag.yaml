@@ -4,7 +4,8 @@ jetR: [0.5]
 # For extra verbose output in some functions
 debug_level: 0
 
-process_observables: ['mass', 'zg', 'theta_g']
+process_observables: ['massPtRatio']
+#process_observables: ['mass', 'massPtRatio', 'zg', 'theta_g']
 jet_matching_distance: 0.6        # Match jets with deltaR < jet_matching_distance*jetR
 reject_tracks_fraction: 0
 
@@ -35,6 +36,24 @@ mass:
   #    zcut: 0.2
   #    beta: 0
 
+###############################################################################
+# Rebinning and unfolding parameters/configurations for jet mass/pt observables
+massPtRatio:
+
+  common_settings:
+    xtitle: '#it{m/pt}_{jet}'
+    ytitle: '#frac{1}{#it{#sigma}_{jet}} #frac{d#it{#sigma}}{d#it{m/pt}_{jet}}'
+
+  ############################################################################
+  config_mPR:
+    name: "massPtRatio"
+
+  ############################################################################
+  config_mPR_SD_zcut01:
+    name: "groomed massPtRatio"
+    SoftDrop:
+      zcut: 0.1
+      beta: 0
 
 ###############################################################################
 # Rebinning and unfolding parameters/configurations for jet groomed observables
