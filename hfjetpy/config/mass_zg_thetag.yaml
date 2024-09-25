@@ -4,7 +4,8 @@ jetR: [0.5]
 # For extra verbose output in some functions
 debug_level: 0
 
-process_observables: ['massPtRatio']
+#process_observables: ['mass']
+process_observables: ['mass', 'zg', 'theta_g']
 #process_observables: ['mass', 'massPtRatio', 'zg', 'theta_g']
 jet_matching_distance: 0.6        # Match jets with deltaR < jet_matching_distance*jetR
 reject_tracks_fraction: 0

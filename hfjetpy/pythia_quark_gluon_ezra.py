@@ -307,6 +307,38 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             mycfg.append('5542:mayDecay = no')   # O0bbc
             mycfg.append('5544:mayDecay = no')   # O*b0bc
             mycfg.append('5554:mayDecay = no')   # O-bbb
+            
+            #bbbar mesons
+            mycfg.append('551:mayDecay = no')    # etab 1S
+            mycfg.append('10551:mayDecay = no')  # chib0 1P
+            #mycfg.append('100551:mayDecay = no') # etab 2S
+            #mycfg.append('110551:mayDecay = no') # chib0 2P
+            #mycfg.append('200551:mayDecay = no') # etab 3P
+            #mycfg.append('210551:mayDecay = no') # chib0 3P
+            mycfg.append('553:mayDecay = no')    # gamma 1S
+            mycfg.append('10553:mayDecay = no')  # hb 1P
+            mycfg.append('20553:mayDecay = no')  # chib1 1P
+            #mycfg.append('30553:mayDecay = no')  # gamma1 1D
+            mycfg.append('100553:mayDecay = no') # gamma 2S
+            #mycfg.append('110553:mayDecay = no') # hb 2P
+            #mycfg.append('120553:mayDecay = no') # chib1 2P
+            #mycfg.append('130553:mayDecay = no') # gamma1 2D
+            mycfg.append('200553:mayDecay = no') # gamma 3S
+            #mycfg.append('210553:mayDecay = no') # hb 3P
+            #mycfg.append('220553:mayDecay = no') # chib1 3P
+            #mycfg.append('300553:mayDecay = no') # gamma 4S
+            #mycfg.append('9000553:mayDecay = no')# gamma 10860
+            #mycfg.append('9010553:mayDecay = no')# gamma 11020
+            mycfg.append('555:mayDecay = no')    # chib2 1P
+            #mycfg.append('10555:mayDecay = no')  # etab2 1D
+            #mycfg.append('20555:mayDecay = no')  # gamma2 1D
+            #mycfg.append('100555:mayDecay = no') # chib2 2P
+            #mycfg.append('110555:mayDecay = no') # etab2 2D 
+            #mycfg.append('120555:mayDecay = no') # gamma2 2D
+            #mycfg.append('200555:mayDecay = no') # chib2 3P
+            #mycfg.append('557:mayDecay = no')    # gamma3 1D
+            #mycfg.append('100557:mayDecay = no') # gamma3 2D
+            
 
 
         if (self.initscat == 1): #if (self.hardbbbar):
@@ -415,6 +447,16 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 mycfg.append('5542:mayDecay = no')   # O0bbc
                 mycfg.append('5544:mayDecay = no')   # O*b0bc
                 mycfg.append('5554:mayDecay = no')   # O-bbb
+                
+                #bbbar mesons
+                mycfg.append('551:mayDecay = no')    # etab 1S
+                mycfg.append('10551:mayDecay = no')  # chib0 1P
+                mycfg.append('553:mayDecay = no')    # gamma 1S
+                mycfg.append('10553:mayDecay = no')  # hb 1P
+                mycfg.append('20553:mayDecay = no')  # chib1 1P
+                mycfg.append('100553:mayDecay = no') # gamma 2S
+                mycfg.append('200553:mayDecay = no') # gamma 3S
+                mycfg.append('555:mayDecay = no')    # chib2 1P
 
         # print the banner first
         fj.ClusterSequence.print_banner()
@@ -482,9 +524,10 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             R_label = str(jetR).replace('.', '') + 'Scaled'
 
             for observable in self.observable_list:
-
-                #if observable not in ["mass", "massPtRatio", "zg", "theta_g"]:
-                if observable not in ["massPtRatio"]:
+                
+                #observable
+                if observable not in ["mass", "massPtRatio", "zg", "theta_g"]:
+                #if observable not in ["mass"]:
                     raise ValueError("Observable %s is not implemented in this script" % observable)
 
                 obs_name = self.obs_names[observable]
@@ -912,26 +955,127 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             # First AKT loop; for IFN loop, see below
 
             # AKT full jets
+            
             for i_jh, jet in enumerate(jets_h):
+                #print("    ")
+                #print("    ")
+                #print("    ")
 
                 # Select for just D0-tagged jets #TODO: check if this D0 goes to kaon pion??
                 D0taggedjet = False
                 N_D0 = 0
                 Dstartaggedjet = False
-                netflav = 0;
-                modflav = 0;
+                #reset counters for each jet
+                #quark count for nf
+                quark_count = 0
+                #mod connt for mod2
+                mod_count = 0
+                #reset tagging to False for each jet
+                #select jets with quark # mod 2 != 1 
                 mod_tagged = False;
+                #select jets with more than 0 b quark
                 nf_tagged = False;
                 
                 if ( self.replaceKPpairs ):
                     # print("There are ", len(jet.constituents()), "constituents.")
                     # print("\nnew\n")
-                    
                     for c in jet.constituents():
+                        #print("-------------------------------------")
+                        #print("-------------------------------------")
                         constituent_pdg_id = pythiafjext.getPythia8Particle(c).id()
                         constituent_pdg_idabs = pythiafjext.getPythia8Particle(c).idAbs()
                         constituent_pdg_index = c.user_index()
                         
+                        constituent_pdg_id_str = str(constituent_pdg_id)
+                        #print("pdg id="+str(constituent_pdg_id_str))
+                        
+                        #counts the length of pdg id
+                        constituent_pdg_id_len = len(constituent_pdg_id_str)
+                        #print("length ="+str(constituent_pdg_id_len))
+                        
+                        #if (constituent_pdg_id_len>2):
+                            #print(constituent_pdg_id_str[-3])
+                        #reset anti particle multiplier for each consituent hadron
+                        anti_mult = 1
+
+                        
+                        # filters out all b baryons        
+                        if (constituent_pdg_id_len == 4 and constituent_pdg_id_str[0] != '-') \
+                            or (constituent_pdg_id_str[0] == '-' and constituent_pdg_id_len == 5):
+                            #print("-------------------------------------")
+                            #print("baryon")
+                            #print("not anti="+str(anti_mult))
+                            
+                            if constituent_pdg_id_str[0] == '-':
+                                #print("anti baryon")
+                                anti_mult = -1
+                                
+                            #print("not anti="+str(anti_mult))
+                            
+                            if constituent_pdg_id_str[-4] == "5":
+                                #print("true")
+                                quark_count += 1*anti_mult
+                                mod_count += 1
+                                #print("quark count="+str(quark_count))
+                                #print("mod count="+str(mod_count))
+                            
+                            elif constituent_pdg_id_str[-3] == "5":
+                                #print("true")
+                                quark_count += 1*anti_mult
+                                mod_count += 1
+                                #print("quark count="+str(quark_count))
+                                #print("mod count="+str(mod_count))
+                                
+                            
+                            elif constituent_pdg_id_str[-2] == "5":
+                                #print("true")
+                                quark_count += 1*anti_mult
+                                mod_count += 1
+                                #print("quark count="+str(quark_count))
+                                #print("mod count="+str(mod_count))
+
+                            #print("number of quark="+str(quark_count))
+                            #print("mod count="+str(mod_count))
+                            
+                            
+                        # should only check the rest of forced hadronized b hadrons
+                        
+                        elif(constituent_pdg_id_len > 2):
+                            #print("-------------------------------------")
+                            #print("not anti="+str(anti_mult))
+                            #print("meson or bbbar mesons")
+                            
+                            if constituent_pdg_id_str[0] == '-':
+                                #print("anti meson")
+                                anti_mult = -1
+                                
+                            #print("not anti="+str(anti_mult))
+                            
+                            #check third digit from right
+                            if constituent_pdg_id_str[-3] == "5":
+                                #print("true")
+                                
+                                quark_count += -1*anti_mult
+                                mod_count += 1
+                                
+                                #print("quark count="+str(quark_count))
+                                #print("mod count="+str(mod_count))
+                            #check second digit from right
+                            if constituent_pdg_id_str[-2] == "5":
+                                #print("true")
+                                #print("bbbar mesons")
+                                
+                                quark_count += 1*anti_mult
+                                mod_count += 1
+                                
+                                #print("quark count="+str(quark_count))
+                                #print("mod count="+str(mod_count))
+                                
+                            #print("number of quark="+str(quark_count))
+                            #print("mod count="+str(mod_count))
+                            
+                        
+                        '''
                         #write a algorithm that filters out the counts of b quarks here
                         if (constituent_pdg_id == 521):
                             # if there is a B+, net flavor +1
@@ -947,6 +1091,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                             netflav += 1;
                             # if there is a B, B count +1
                             modflav += 1;
+                        '''
                         
                         #print("constituent_pdg_idabs = "+str(constituent_pdg_idabs)+"\n")
 
@@ -986,12 +1131,14 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                     #print("modflav = %i" % modflav)
                     
                     # if net flavor = 1, that net flavor is b+
-                    if (netflav != 0):
+                    #print("b quark count="+str(quark_count))
+                    if (quark_count != 0):
                         nf_tagged = True
                         #print("nf_tagged True")
-                    
+                        
+                    #print("mod count="+str(mod_count))
                     # if modular b hadron number is not 0, there is one b hadron in the jet 
-                    if ((modflav%2) != 0):
+                    if ((mod_count%2) != 0):
                         mod_tagged = True
                         #print("mod_tagged True")
                         
@@ -1421,6 +1568,8 @@ class PythiaQuarkGluon(process_base.ProcessBase):
             return jet.m()
         
         #rdc
+        # the production is funny, pt spectrum does not match
+        # should be a bug in production
         elif observable == "massPtRatio":
             
             j_massPtRatio = jet.m()/jet_pt_ungroomed

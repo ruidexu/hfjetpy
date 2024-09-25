@@ -12,7 +12,7 @@ export WORKDIR=/afs/cern.ch/work/r/ruide
 # Center of mass energy in GeV
 ECM=5020
 
-FNAME="analysisResultBpRej.root" 
+FNAME="nfmodquarkcount.root" 
 
 # Number of events per pT-hat bin (for statistics)
 NEV_DESIRED=500000
@@ -44,7 +44,7 @@ fi
 SEED=$(( ($CORE_IN_BIN - 1) * NEV_PER_JOB + 1111))
 echo SEED IS $SEED
 # Do the PYTHIA simulation & matching
-OUTDIR="/afs/cern.ch/work/r/ruide/lib/outBptmux13tev"
+OUTDIR="/afs/cern.ch/work/r/ruide/lib/outBptmux13tev2"
 mkdir -p $OUTDIR
 module use $WORKDIR/yasp/software/modules
 source $WORKDIR/yasp/venvyasp/bin/activate
