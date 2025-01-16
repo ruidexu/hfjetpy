@@ -590,7 +590,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                         getattr(self, hist_list_name).append(h3D)
 
                         # jetflav IRC-safe algorithms
-                        for algo_name in ["nfakt","modakt","JADE", "WTA", "IFN", "CMP", "GHS"]:
+                        for algo_name in ["fjmod","nfakt","modakt","JADE", "WTA", "IFN", "CMP", "GHS"]:
                             name = ('h3D_%s_%s_JetPt_%s_R%s_%s' % (observable, algo_name, parton_type, jetR, obs_label)) if \
                                 len(obs_label) else ('h3D_%s_%s_JetPt_%s_R%s' % (observable, algo_name, parton_type, jetR))
                             h3D = ROOT.TH3D(name, name, len(pt_bins)-1, pt_bins, len(pt_bins)-1, pt_bins, len(obs_bins)-1, obs_bins)
@@ -972,13 +972,14 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 mod_count = 0
                 #reset tagging to False for each jet
                 #select jets with quark # mod 2 != 1 
-                mod_tagged = False;
+                mod_tagged = False
                 #select jets with more than 0 b quark
-                nf_tagged = False;
+                nf_tagged = False
                 
                 if ( self.replaceKPpairs ):
                     # print("There are ", len(jet.constituents()), "constituents.")
                     # print("\nnew\n")
+
                     for c in jet.constituents():
                         #print("-------------------------------------")
                         #print("-------------------------------------")
@@ -997,7 +998,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                             #print(constituent_pdg_id_str[-3])
                         #reset anti particle multiplier for each consituent hadron
                         anti_mult = 1
-
+                    
                         
                         # filters out all b baryons        
                         if (constituent_pdg_id_len == 4 and constituent_pdg_id_str[0] != '-') \
@@ -1333,11 +1334,6 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                             observable, jet, jet_groomed_lund, jetR, obs_setting,
                             grooming_setting, obs_label, jet.pt())
                         
-                        '''
-                        rdc
-                        # correct def parton_types list here??
-                        # only bottom
-                        '''
                         for parton_type in ["beauty"]: # parton_types:
                             #fill parton hnsparse info
                             if (self.replaceKPpairs or self.phimeson): # phimeson has bad naming convention but is properly filled here
@@ -1373,6 +1369,7 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                                 getattr(self, ('h3D_%s_WTA_JetPt_%s_R%s_%s' % (observable, parton_type, jetR, obs_label)) if \
                                     len(obs_label) else ('h3D_%s_WTA_JetPt_%s_R%s' % (observable, parton_type, jetR))).Fill(
                                     jet.pt(), D0_pt, obs)
+
                                   
             # jetflav IRC-safe jets
             if self.replaceKPpairs or self.phimeson:
@@ -1380,6 +1377,25 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 jet_def_base = fj.JetDefinition(fj.antikt_algorithm, jetR)
                 flav_recombiner = fj.contrib.FlavRecombiner()
                 jet_def_base.set_recombiner(flav_recombiner)
+
+                '''pdg_ids = [pythiafjext.getPythia8Particle(p).id() for p in parts_pythia_h]
+                jet_def_base = fj.JetDefinition(fj.antikt_algorithm, jetR)
+
+                #defaulted to net flav summation
+                #flav_recombiner = fj.contrib.FlavRecombiner()
+                #set to modulo 2 summation
+                flav_recombiner = fj.contrib.FlavRecombiner(fj.contrib.FlavRecombiner.modulo_2)
+                jet_def_base.set_recombiner(flav_recombiner)
+                for ip, p in enumerate(parts_pythia_h):  # Reset user info
+                    p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
+                jets_h_base = fj.sorted_by_pt(jet_selector(jet_def_base(parts_selector_h(parts_pythia_h))))
+
+                #only recording jet with pdgid = 521
+                #Daniel's algorithm checks over all b hadrons
+                self.one_h_flav_event_selector(jets_h_base, jetR, "fjmod", False)
+
+                flav_recombiner = fj.contrib.FlavRecombiner()
+                jet_def_base.set_recombiner(flav_recombiner)'''
 
                 # IFN jets
                 IFN_alpha = 2;  IFN_omega = 3 - IFN_alpha;  # IFN constants
@@ -1420,6 +1436,26 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 #The fourth arg turn on/off(True/False) jet constituent selector
                 #self.one_h_flav_event_selector(jets_h_CMP, jetR, "CMP", True)
                 self.one_h_flav_event_selector(jets_h_CMP, jetR, "CMP", False)
+
+                jet_def_fjmod = fj.JetDefinition(fj.antikt_algorithm, jetR)
+                #defaulted to net flav summation
+                #flav_recombiner = fj.contrib.FlavRecombiner()
+                #set to modulo 2 summation
+
+                #####rename the flav_recombiner#####
+
+                flav_recombiner_fjmod = fj.contrib.FlavRecombiner(fj.contrib.FlavRecombiner.modulo_2)
+                jet_def_fjmod.set_recombiner(flav_recombiner_fjmod)
+                for ip, p in enumerate(parts_pythia_h):  # Reset user info
+                    p.set_user_info(fj.contrib.FlavHistory(pdg_ids[ip]))
+                jets_h_fjmod = fj.sorted_by_pt(jet_selector(jet_def_fjmod(parts_selector_h(parts_pythia_h))))
+
+                #rdc
+                #only recording jet with four mom pdgid = 521
+                #Daniel's algorithm records jet with b quarks in it with four mom of the highest pt particle
+
+                #not sure if this implementation is right
+                self.one_h_flav_event_selector(jets_h_fjmod, jetR, "fjmod", False)
 
             setattr(self, "count1_R%s" % jetR_str, count1)
             setattr(self, "count2_R%s" % jetR_str, count2)
@@ -1493,7 +1529,10 @@ class PythiaQuarkGluon(process_base.ProcessBase):
                 flav_info = fj.contrib.FlavHistory.current_flavour_of(c)
                 pdg_idabs = abs(flav_info.pdg_code())
                 pdg_ids.append(pdg_idabs)
+
+                #rdc changed the definition here
                 if (pdg_idabs == 521):
+                #if (str(pdg_idabs)[-4] == 5) or (str(pdg_idabs)[-3] == 5):
                     D0meson = c
             if not D0meson:  # There is bottom but not b+
                 return
